@@ -1,0 +1,193 @@
+{
+  "name": "jumpproto",
+  "displayName": "JumpProto",
+  "description": "在 Go 与 .proto 之间双向跳转，支持字段与内部元素级精确定位。",
+  "version": "1.0.7",
+  "icon": "resources/marketplace-icon.png",
+  "publisher": "SivanLiu",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SivanCola/JumpProto.git"
+  },
+  "engines": {
+    "vscode": "^1.70.0"
+  },
+  "files": [
+    "out/**",
+    "resources/proto-jump-icon.svg",
+    "resources/marketplace-icon.png",
+    "package.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "categories": [
+    "Programming Languages",
+    "Other"
+  ],
+  "keywords": [
+    "proto",
+    "protobuf",
+    "golang",
+    "go",
+    "pb.go",
+    "jump",
+    "definition",
+    "navigation",
+    "cursor",
+    "vscode"
+  ],
+  "activationEvents": [
+    "onLanguage:go",
+    "onLanguage:proto",
+    "onLanguage:proto3",
+    "onLanguage:protobuf",
+    "onCommand:protoJump.goToProtoDefinition",
+    "onCommand:protoJump.goToGoUsage",
+    "onCommand:protoJump.openSettings",
+    "onCommand:protoJump.addProtoRoot",
+    "onCommand:protoJump.removeProtoRoot",
+    "onCommand:protoJump.toggleSearchInWorkspace",
+    "onCommand:protoJump.refreshView",
+    "onCommand:protoJump.selectLanguage",
+    "onCommand:protoJump.editMakeProtoRule",
+    "onCommand:protoJump.openMakeProtoRuleHelp",
+    "onCommand:protoJump.compileCurrentProto",
+    "onView:protoJump.view"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "protoJump.goToProtoDefinition",
+        "title": "JumpProto: Go to Proto Definition"
+      },
+      {
+        "command": "protoJump.goToGoUsage",
+        "title": "JumpProto: Go to Go Usage"
+      },
+      {
+        "command": "protoJump.openSettings",
+        "title": "JumpProto: Open Settings"
+      },
+      {
+        "command": "protoJump.addProtoRoot",
+        "title": "JumpProto: Add Proto Root"
+      },
+      {
+        "command": "protoJump.removeProtoRoot",
+        "title": "JumpProto: Remove Proto Root"
+      },
+      {
+        "command": "protoJump.toggleSearchInWorkspace",
+        "title": "JumpProto: Toggle Search In Workspace"
+      },
+      {
+        "command": "protoJump.refreshView",
+        "title": "JumpProto: Refresh View"
+      },
+      {
+        "command": "protoJump.selectLanguage",
+        "title": "JumpProto: Select Language"
+      },
+      {
+        "command": "protoJump.editMakeProtoRule",
+        "title": "JumpProto: Edit Make Proto Rule"
+      },
+      {
+        "command": "protoJump.openMakeProtoRuleHelp",
+        "title": "JumpProto: Make Proto Rule Help"
+      },
+      {
+        "command": "protoJump.compileCurrentProto",
+        "title": "JumpProto: Compile Current Proto"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "protoJump.goToProtoDefinition",
+          "when": "editorTextFocus && editorLangId == go",
+          "group": "navigation@50"
+        },
+        {
+          "command": "protoJump.goToGoUsage",
+          "when": "editorTextFocus && resourceExtname == .proto",
+          "group": "navigation@51"
+        },
+        {
+          "command": "protoJump.compileCurrentProto",
+          "when": "editorTextFocus && resourceExtname == .proto",
+          "group": "navigation@52"
+        }
+      ],
+      "view/item/context": []
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "protoJump",
+          "title": "JumpProto",
+          "icon": "resources/proto-jump-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "protoJump": [
+        {
+          "id": "protoJump.view",
+          "name": "JumpProto",
+          "type": "webview"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "JumpProto",
+      "properties": {
+        "protoJump.protoRoots": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Directories that contain your source .proto files (e.g. /ABSOLUTE/PATH/TO/proto_src or $HOME/project/proto_src). Used to resolve the // source: path/to/file.proto comment in generated .pb.go files."
+        },
+        "protoJump.uiLanguage": {
+          "type": "string",
+          "enum": [
+            "zh",
+            "en"
+          ],
+          "default": "en",
+          "scope": "application",
+          "description": "UI language for JumpProto view and messages."
+        },
+        "protoJump.searchInWorkspace": {
+          "type": "boolean",
+          "default": true,
+          "description": "Also search for proto files inside the current workspace if protoRoots does not resolve the path."
+        },
+        "protoJump.makeProtoCommand": {
+          "type": "string",
+          "default": "",
+          "description": "Shell command template used to compile the current .proto file. Supported placeholders: {workspaceFolder}, {protoSrcRoot}, {protoFile}, {protoFileNoExt}, {protoDir}, {relativeProto}, {relativeProtoNoExt}, {protoPackage}."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "dev": "npm run watch",
+    "dev:host": "code --extensionDevelopmentPath=.",
+    "reinstall:vsix": "npm run vsix && code --install-extension dist/JumpProto.vsix --force",
+    "vsix": "npm run compile && node -e \"require('fs').mkdirSync('dist',{recursive:true})\" && npx @vscode/vsce package --out dist/JumpProto.vsix",
+    "test": "npm run compile && node --test out/*.test.js",
+    "watch": "tsc -watch -p .",
+    "vscode:prepublish": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "@types/vscode": "^1.70.0",
+    "typescript": "^5.7.3"
+  }
+}
