@@ -2,13 +2,16 @@
   "name": "jumpproto",
   "displayName": "JumpProto",
   "description": "在 Go 与 .proto 之间双向跳转，支持字段与内部元素级精确定位。",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "icon": "resources/marketplace-icon.png",
   "publisher": "SivanLiu",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/SivanCola/JumpProto.git"
+  },
+  "bugs": {
+    "url": "https://github.com/SivanCola/JumpProto/issues"
   },
   "engines": {
     "vscode": "^1.70.0"
