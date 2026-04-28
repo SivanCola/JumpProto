@@ -5,7 +5,7 @@
   "version": "1.0.7",
   "icon": "resources/marketplace-icon.png",
   "publisher": "SivanLiu",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/SivanCola/JumpProto.git"
@@ -19,7 +19,9 @@
     "resources/marketplace-icon.png",
     "package.json",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "NOTICE",
+    "THIRD_PARTY_NOTICES.md"
   ],
   "categories": [
     "Programming Languages",

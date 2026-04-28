@@ -1,3 +1,6 @@
+// Copyright 2026 JumpProto contributors.
+// SPDX-License-Identifier: Apache-2.0
+
 const PROTO_SOURCE_RE = /^\/\/\s*(?:source|Source):\s*(.+?\.proto)\s*$/m;
 
 export function extractProtoPathFromPbGo(generatedGoText: string): string | undefined {

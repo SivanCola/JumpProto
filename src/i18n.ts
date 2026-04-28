@@ -1,3 +1,6 @@
+// Copyright 2026 JumpProto contributors.
+// SPDX-License-Identifier: Apache-2.0
+
 import * as vscode from 'vscode';
 
 export type UiLanguage = 'zh' | 'en';

@@ -206,6 +206,12 @@ Supported placeholders:
 文档示例统一使用占位路径（如 `/ABSOLUTE/PATH/TO/...`、`$HOME/...`），避免暴露个人目录信息。  
 All path examples use placeholders to avoid exposing personal local directory information.
 
+## 开源协议 / License
+
+JumpProto 以 Apache License 2.0 开源，详见 [LICENSE](LICENSE)。第三方素材声明见 [NOTICE](NOTICE) 和 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
+JumpProto is licensed under the Apache License 2.0. Third-party asset notices are listed in [NOTICE](NOTICE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
 ## Bug 反馈 / Bug Reports
 
 - 提交地址 / Report here: <https://github.com/SivanCola/issues/issues>

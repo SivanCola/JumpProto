@@ -1,3 +1,6 @@
+// Copyright 2026 JumpProto contributors.
+// SPDX-License-Identifier: Apache-2.0
+
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { execFile as execFileCb } from 'node:child_process';
