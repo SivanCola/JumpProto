@@ -23,6 +23,8 @@ import {
   scanProtoSymbols,
   type ProtoFieldContext
 } from './protoScanner';
+import { estimateStringBytes, LruCache, MIB } from './lruCache';
+import { toGoExportedName } from './naming';
 import { mergeLocations, normalizeSlashes } from './utils';
 
 export type GoUsage = {
@@ -35,6 +37,9 @@ const MAX_WORKSPACE_GO_FILES = 5000;
 const MAX_USAGE_RESULTS = 200;
 const MAX_REFERENCE_LOCATIONS = 200;
 const PB_HEADER_BYTES = 6000;
+const REFERENCE_PEEK_EXPAND_DELAYS_MS = [80, 220, 420];
+const GO_FILE_TEXT_CACHE_LIMIT_BYTES = 128 * MIB;
+const CANDIDATE_GO_FILE_CACHE_LIMIT = 150;
 
 type CachedFileText = {
   mtimeMs: number;
@@ -51,12 +56,33 @@ type CachedPbHeader = {
 
 let goFileUrisCache: { excludeKey: string; uris: vscode.Uri[] } | undefined;
 let pbGoFileUrisCache: { excludeKey: string; uris: vscode.Uri[] } | undefined;
-const fileTextCache = new Map<string, CachedFileText>();
+const candidateGoFileUrisCache = new LruCache<string, { excludeKey: string; uris: vscode.Uri[] }>({
+  maxEntries: CANDIDATE_GO_FILE_CACHE_LIMIT
+});
+const fileTextCache = new LruCache<string, CachedFileText>({
+  maxSize: GO_FILE_TEXT_CACHE_LIMIT_BYTES,
+  sizeOf: value => estimateStringBytes(value.text)
+});
 const pbHeaderCache = new Map<string, CachedPbHeader>();
 const protoPackageInfoCache = new Map<string, GoPackageInfo | undefined>();
 
 function isCancellationRequested(token?: vscode.CancellationToken): boolean {
   return token?.isCancellationRequested === true;
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function expandReferencePeekTree(): Promise<void> {
+  for (const delayMs of REFERENCE_PEEK_EXPAND_DELAYS_MS) {
+    await delay(delayMs);
+    try {
+      await vscode.commands.executeCommand('list.expandAll');
+    } catch {
+      return;
+    }
+  }
 }
 
 function buildConfigCacheKey(config: ProtoJumpConfig): string {
@@ -107,6 +133,37 @@ async function getWorkspacePbGoFileUris(token?: vscode.CancellationToken): Promi
 
 async function getNonGeneratedGoFileUris(token?: vscode.CancellationToken): Promise<vscode.Uri[]> {
   return (await getWorkspaceGoFileUris(token)).filter(uri => !isGeneratedGoFile(uri));
+}
+
+function normalizeCandidateTerms(terms: string[] | undefined): string[] {
+  return Array.from(new Set((terms ?? []).map(term => term.trim()).filter(Boolean))).sort();
+}
+
+async function getCandidateGoFileUris(
+  candidateTerms: string[] | undefined,
+  token?: vscode.CancellationToken
+): Promise<vscode.Uri[]> {
+  const terms = normalizeCandidateTerms(candidateTerms);
+  if (terms.length === 0) return getNonGeneratedGoFileUris(token);
+
+  const config = getConfig();
+  const excludeKey = config.exclude.join('\n');
+  const cacheKey = terms.join('\n');
+  const cached = candidateGoFileUrisCache.get(cacheKey);
+  if (cached?.excludeKey === excludeKey) return cached.uris;
+
+  const uris: vscode.Uri[] = [];
+  for (const uri of await getNonGeneratedGoFileUris(token)) {
+    if (isCancellationRequested(token)) return uris;
+    const text = await readCachedFileText(uri, token);
+    if (text === undefined) continue;
+    if (terms.every(term => text.includes(term))) uris.push(uri);
+  }
+
+  if (!isCancellationRequested(token)) {
+    candidateGoFileUrisCache.set(cacheKey, { excludeKey, uris });
+  }
+  return uris;
 }
 
 async function readCachedFileText(uri: vscode.Uri, token?: vscode.CancellationToken): Promise<string | undefined> {
@@ -182,6 +239,7 @@ async function readCachedPbHeader(uri: vscode.Uri, token?: vscode.CancellationTo
 export function clearGoUsageCaches(): void {
   goFileUrisCache = undefined;
   pbGoFileUrisCache = undefined;
+  candidateGoFileUrisCache.clear();
   fileTextCache.clear();
   pbHeaderCache.clear();
   protoPackageInfoCache.clear();
@@ -286,18 +344,6 @@ export function getProtoDefinitionNameAtCursor(editor: vscode.TextEditor): strin
   return getProtoDefinitionNameAtPosition(editor.document, editor.selection.active);
 }
 
-function toGoExportedName(protoName: string): string {
-  const parts = protoName.split('_').filter(Boolean);
-  let out = '';
-  for (let i = 0; i < parts.length; i += 1) {
-    const seg = parts[i];
-    const mapped = seg.length === 0 ? seg : seg[0].toUpperCase() + seg.slice(1);
-    if (i > 0 && /^\d/.test(seg)) out += '_';
-    out += mapped;
-  }
-  return out;
-}
-
 function getProtoFieldContextAtPosition(
   doc: vscode.TextDocument,
   pos: vscode.Position
@@ -368,6 +414,7 @@ export async function showReferencesNative(
   locations: vscode.Location[]
 ): Promise<void> {
   await vscode.commands.executeCommand('editor.action.showReferences', sourceUri, sourcePos, locations);
+  void expandReferencePeekTree();
 }
 
 function mergeGoUsageResults(...groups: GoUsage[][]): GoUsage[] {
@@ -399,10 +446,11 @@ async function findGoUsagesInWorkspaceByText(
   searchText: (text: string) => GoTextUsage[],
   maxResults: number,
   filePredicate?: (uri: vscode.Uri, text: string) => boolean,
-  token?: vscode.CancellationToken
+  token?: vscode.CancellationToken,
+  candidateTerms?: string[]
 ): Promise<GoUsage[]> {
   const results: GoUsage[] = [];
-  const uris = await getNonGeneratedGoFileUris(token);
+  const uris = await getCandidateGoFileUris(candidateTerms, token);
 
   for (const uri of uris) {
     if (isCancellationRequested(token)) return results;
@@ -429,7 +477,8 @@ export async function findGoUsagesPreferQualifiedName(
     text => findGoSymbolUsagesInText(text, symbolName, goPkg),
     MAX_USAGE_RESULTS,
     (_uri, text) => text.includes(symbolName),
-    token
+    token,
+    [symbolName]
   );
 }
 
@@ -443,7 +492,8 @@ async function findGoCompositeFieldUsages(
     text => findGoCompositeFieldUsagesInText(text, messageName, goFieldName, goPkg),
     MAX_USAGE_RESULTS,
     (_uri, text) => text.includes(goFieldName) && text.includes(messageName),
-    token
+    token,
+    [goFieldName]
   );
 }
 
@@ -457,7 +507,8 @@ async function findGoVariableFieldUsages(
     text => findGoVariableFieldUsagesInText(text, messageName, goFieldName, goPkg),
     MAX_USAGE_RESULTS,
     (_uri, text) => text.includes(goFieldName) && text.includes(messageName),
-    token
+    token,
+    [goFieldName]
   );
 }
 
@@ -470,7 +521,8 @@ async function findGoFieldAccessUsages(
     text => findGoFieldAccessUsagesInText(text, goFieldName),
     MAX_USAGE_RESULTS,
     filePredicate,
-    token
+    token,
+    [goFieldName]
   );
 }
 
@@ -559,6 +611,9 @@ export async function getGoUsagesForProtoPosition(
 export class ProtoGoDefinitionProvider implements vscode.DefinitionProvider {
   async provideDefinition(document: vscode.TextDocument, position: vscode.Position, token: vscode.CancellationToken): Promise<vscode.Definition | vscode.LocationLink[]> {
     const locations = await getGoUsagesForProtoPosition(document, position, false, token);
+    if (locations && locations.length > 1) {
+      void expandReferencePeekTree();
+    }
     return locations || [];
   }
 }

@@ -1,19 +1,9 @@
 {
   "name": "jumpproto",
   "displayName": "JumpProto",
-  "description": "在 Go 与 .proto 之间双向跳转，支持字段与内部元素级精确定位。",
-  "version": "1.0.8",
+  "description": "%extension.description%",
+  "version": "1.0.9",
   "icon": "resources/marketplace-icon.png",
-  "files": [
-    "out",
-    "resources",
-    "package.json",
-    "README.md",
-    "CHANGELOG.md",
-    "LICENSE",
-    "NOTICE",
-    "THIRD_PARTY_NOTICES.md"
-  ],
   "publisher": "SivanLiu",
   "license": "Apache-2.0",
   "repository": {
@@ -23,6 +13,10 @@
   "homepage": "https://github.com/SivanCola/JumpProto#readme",
   "bugs": {
     "url": "https://github.com/SivanCola/JumpProto/issues"
+  },
+  "galleryBanner": {
+    "color": "#10131d",
+    "theme": "dark"
   },
   "engines": {
     "vscode": "^1.70.0"
@@ -62,69 +56,107 @@
     "onCommand:protoJump.diagnoseCurrentSymbol",
     "onCommand:protoJump.testNavigation",
     "onCommand:protoJump.openOutput",
+    "onCommand:protoJump.clearCaches",
     "onView:protoJump.view"
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "languages": [
+      {
+        "id": "proto",
+        "aliases": [
+          "Proto",
+          "Protocol Buffers",
+          "Protobuf"
+        ],
+        "extensions": [
+          ".proto"
+        ],
+        "configuration": "./resources/proto-language-configuration.json"
+      }
+    ],
     "commands": [
       {
         "command": "protoJump.goToProtoDefinition",
-        "title": "JumpProto: Go to Proto Definition"
+        "title": "%command.jumpToProto%"
       },
       {
         "command": "protoJump.goToGoUsage",
-        "title": "JumpProto: Go to Go Usage"
+        "title": "%command.jumpToGo%"
       },
       {
         "command": "protoJump.openSettings",
-        "title": "JumpProto: Open Settings"
+        "title": "%command.openSettings%"
       },
       {
         "command": "protoJump.addProtoRoot",
-        "title": "JumpProto: Add Proto Root"
+        "title": "%command.addProtoRoot%"
       },
       {
         "command": "protoJump.removeProtoRoot",
-        "title": "JumpProto: Remove Proto Root"
+        "title": "%command.removeProtoRoot%"
       },
       {
         "command": "protoJump.toggleSearchInWorkspace",
-        "title": "JumpProto: Toggle Search In Workspace"
+        "title": "%command.toggleSearchInWorkspace%"
       },
       {
         "command": "protoJump.refreshView",
-        "title": "JumpProto: Refresh View"
+        "title": "%command.refreshView%"
       },
       {
         "command": "protoJump.selectLanguage",
-        "title": "JumpProto: Select Language"
+        "title": "%command.selectLanguage%"
       },
       {
         "command": "protoJump.editMakeProtoRule",
-        "title": "JumpProto: Edit Make Proto Rule"
+        "title": "%command.editMakeProtoRule%"
       },
       {
         "command": "protoJump.openMakeProtoRuleHelp",
-        "title": "JumpProto: Make Proto Rule Help"
+        "title": "%command.makeProtoRuleHelp%"
       },
       {
         "command": "protoJump.compileCurrentProto",
-        "title": "JumpProto: Compile Current Proto"
+        "title": "%command.compileThisProto%"
       },
       {
         "command": "protoJump.diagnoseCurrentSymbol",
-        "title": "JumpProto: Diagnose Current Symbol"
+        "title": "%command.diagnoseCurrentSymbol%"
       },
       {
         "command": "protoJump.testNavigation",
-        "title": "JumpProto: Test Navigation"
+        "title": "%command.testNavigation%"
       },
       {
         "command": "protoJump.openOutput",
-        "title": "JumpProto: Open Output"
+        "title": "%command.openOutput%"
+      },
+      {
+        "command": "protoJump.clearCaches",
+        "title": "%command.clearCache%",
+        "icon": "$(trash)"
       }
     ],
     "menus": {
+      "commandPalette": [
+        {
+          "command": "protoJump.openSettings",
+          "when": "false"
+        },
+        {
+          "command": "protoJump.toggleSearchInWorkspace",
+          "when": "false"
+        },
+        {
+          "command": "protoJump.refreshView",
+          "when": "false"
+        },
+        {
+          "command": "protoJump.selectLanguage",
+          "when": "false"
+        }
+      ],
       "editor/context": [
         {
           "command": "protoJump.goToProtoDefinition",
@@ -140,11 +172,6 @@
           "command": "protoJump.compileCurrentProto",
           "when": "editorTextFocus && resourceExtname == .proto",
           "group": "navigation@52"
-        },
-        {
-          "command": "protoJump.diagnoseCurrentSymbol",
-          "when": "editorTextFocus && (editorLangId == go || resourceExtname == .proto)",
-          "group": "navigation@53"
         }
       ],
       "view/item/context": []
@@ -168,7 +195,7 @@
       ]
     },
     "configuration": {
-      "title": "JumpProto",
+      "title": "%configuration.title%",
       "properties": {
         "protoJump.protoRoots": {
           "type": "array",
@@ -176,7 +203,7 @@
             "type": "string"
           },
           "default": [],
-          "description": "Directories that contain your source .proto files (e.g. /ABSOLUTE/PATH/TO/proto_src or $HOME/project/proto_src). Used to resolve the // source: path/to/file.proto comment in generated .pb.go files."
+          "description": "%configuration.protoRoots.description%"
         },
         "protoJump.uiLanguage": {
           "type": "string",
@@ -186,17 +213,17 @@
           ],
           "default": "en",
           "scope": "application",
-          "description": "UI language for JumpProto view and messages."
+          "description": "%configuration.uiLanguage.description%"
         },
         "protoJump.searchInWorkspace": {
           "type": "boolean",
           "default": true,
-          "description": "Also search for proto files inside the current workspace if protoRoots does not resolve the path."
+          "description": "%configuration.searchInWorkspace.description%"
         },
         "protoJump.makeProtoCommand": {
           "type": "string",
           "default": "",
-          "description": "Shell command template used to compile the current .proto file. Supported placeholders: {workspaceFolder}, {protoSrcRoot}, {protoFile}, {protoFileNoExt}, {protoDir}, {relativeProto}, {relativeProtoNoExt}, {protoPackage}."
+          "description": "%configuration.makeProtoCommand.description%"
         },
         "protoJump.exclude": {
           "type": "array",
@@ -210,7 +237,7 @@
             "**/dist/**",
             "**/.git/**"
           ],
-          "description": "Glob patterns excluded from JumpProto workspace searches. Use this to skip generated, vendor, build, or large directories."
+          "description": "%configuration.exclude.description%"
         }
       }
     }

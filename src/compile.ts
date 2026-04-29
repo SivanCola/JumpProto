@@ -9,6 +9,9 @@ import * as vscode from 'vscode';
 import { getConfig } from './config';
 import { getStrings } from './i18n';
 import { resolveProtoSrcRootPath } from './pathResolver';
+import { inferProtoPackage } from './protoMetadata';
+import { redactMessagePathsForOutput } from './redaction';
+import { resolveShellInvocation, shellQuote } from './shell';
 import { normalizeSlashes } from './utils';
 
 const execFile = promisify(execFileCb);
@@ -24,10 +27,6 @@ export type ProtoCompileContext = {
   protoPackage: string,
 };
 
-export function shellQuote(value: string): string {
-  return `'${value.replaceAll("'", `'\\''`)}'`;
-}
-
 export function resolveProtoSrcRoot(protoFile: string): string | undefined {
   return resolveProtoSrcRootPath(protoFile, getConfig().protoRoots);
 }
@@ -40,13 +39,7 @@ export function resolveProtoCompileContext(doc: vscode.TextDocument): ProtoCompi
 
   const relativeProto = normalizeSlashes(path.relative(protoSrcRoot, protoFile));
   const workspaceFolder = vscode.workspace.getWorkspaceFolder(doc.uri)?.uri.fsPath ?? path.dirname(protoSrcRoot);
-  const text = doc.getText();
-  const goPackageMatch = text.match(/^\s*option\s+go_package\s*=\s*"([^"]+)";/m);
-  const protoPackageMatch = text.match(/^\s*package\s+([A-Za-z_][A-Za-z0-9_.]*)\s*;/m);
-  const protoPackage = goPackageMatch
-    ? (goPackageMatch[1].split(';').pop()?.split('/').pop()?.trim() ?? '')
-    : (protoPackageMatch?.[1].split('.').pop()?.trim() ?? '');
-  if (!protoPackage) return undefined;
+  const protoPackage = inferProtoPackage(doc.getText());
 
   const protoFileNoExt = path.basename(protoFile, '.proto');
   return {
@@ -120,19 +113,27 @@ export async function testMakeProtoRule(value: unknown, output: vscode.OutputCha
 
   const rendered = applyMakeProtoTemplate(rule, compileCtx);
   output.clear();
-  output.appendLine(`[dry-run] ${rendered}`);
+  output.appendLine(`[dry-run] ${redactMessagePathsForOutput(rendered)}`);
 
   try {
-    await execFile('/bin/zsh', ['-n', '-c', rendered], {
+    const invocation = resolveShellInvocation(rendered, 'syntax');
+    if (!invocation.supportsSyntaxCheck) {
+      output.appendLine(`[dry-run] ${strings.testMakeProtoRuleRenderedOnly}`);
+      output.show(true);
+      vscode.window.showInformationMessage(strings.testMakeProtoRuleRenderedOnly);
+      return;
+    }
+    await execFile(invocation.executable, invocation.args, {
       cwd: compileCtx.workspaceFolder,
       maxBuffer: 10 * 1024 * 1024
     });
     vscode.window.showInformationMessage(strings.testMakeProtoRuleDone);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    output.appendLine(message);
+    const redactedMessage = redactMessagePathsForOutput(message);
+    output.appendLine(redactedMessage);
     output.show(true);
-    vscode.window.showErrorMessage(`${strings.testMakeProtoRuleFailed} ${message}`);
+    vscode.window.showErrorMessage(`${strings.testMakeProtoRuleFailed} ${redactedMessage}`);
   }
 }
 
@@ -159,25 +160,27 @@ export async function compileCurrentProto(output: vscode.OutputChannel): Promise
 
   const rendered = applyMakeProtoTemplate(makeProtoCommand, compileCtx);
   output.clear();
-  output.appendLine(`[command] ${rendered}`);
+  output.appendLine(`[command] ${redactMessagePathsForOutput(rendered)}`);
 
   try {
     await vscode.window.withProgress(
       { location: vscode.ProgressLocation.Notification, title: strings.compilingCurrentProto, cancellable: false },
       async () => {
-        const result = await execFile('/bin/zsh', ['-lc', rendered], {
+        const invocation = resolveShellInvocation(rendered, 'execute');
+        const result = await execFile(invocation.executable, invocation.args, {
           cwd: compileCtx.workspaceFolder,
           maxBuffer: 10 * 1024 * 1024
         });
-        if (result.stdout) output.appendLine(result.stdout.trimEnd());
-        if (result.stderr) output.appendLine(result.stderr.trimEnd());
+        if (result.stdout) output.appendLine(redactMessagePathsForOutput(result.stdout.trimEnd()));
+        if (result.stderr) output.appendLine(redactMessagePathsForOutput(result.stderr.trimEnd()));
       }
     );
     vscode.window.showInformationMessage(strings.compileCurrentProtoDone);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    output.appendLine(message);
+    const redactedMessage = redactMessagePathsForOutput(message);
+    output.appendLine(redactedMessage);
     output.show(true);
-    vscode.window.showErrorMessage(`${strings.compileCurrentProtoFailed} ${message}`);
+    vscode.window.showErrorMessage(`${strings.compileCurrentProtoFailed} ${redactedMessage}`);
   }
 }

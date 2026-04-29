@@ -1,6 +1,8 @@
 // Copyright 2026 JumpProto contributors.
 // SPDX-License-Identifier: Apache-2.0
 
+import { getGoPackageOptionValue, parseGoPackageOptionValue } from './protoMetadata';
+
 export type GoPackageInfo = {
   packageName: string;
   importPath?: string;
@@ -29,6 +31,14 @@ export type GoSymbolSearchPlan = {
   includeBare: boolean;
 };
 
+export type GoQualifiedImportRef = {
+  qualifier: string;
+  symbolName: string;
+  importPath: string;
+  symbolStartOffset: number;
+  symbolEndOffset: number;
+};
+
 type GoToken = {
   type: 'identifier' | 'string' | 'number' | 'punctuation' | 'operator';
   value: string;
@@ -43,28 +53,8 @@ type TokenContext = {
 };
 
 export function parseGoPackageInfo(protoText: string): GoPackageInfo | undefined {
-  const goPackageMatch = protoText.match(/^\s*option\s+go_package\s*=\s*"([^"]+)";/m);
-  if (!goPackageMatch) return undefined;
-
-  const value = goPackageMatch[1].trim();
-  if (!value) return undefined;
-  if (value.includes(';')) {
-    const [importPath, packageName] = value.split(';');
-    const trimmedPackageName = packageName?.trim();
-    if (!trimmedPackageName) return undefined;
-    return {
-      packageName: trimmedPackageName,
-      importPath: importPath.trim() || undefined
-    };
-  }
-
-  const parts = value.split('/');
-  const packageName = parts[parts.length - 1]?.trim();
-  if (!packageName) return undefined;
-  return {
-    packageName,
-    importPath: value.includes('/') ? value : undefined
-  };
+  const value = getGoPackageOptionValue(protoText);
+  return value ? parseGoPackageOptionValue(value) : undefined;
 }
 
 export function buildGoSymbolSearchPlan(
@@ -72,12 +62,23 @@ export function buildGoSymbolSearchPlan(
   symbolName: string,
   goPkg?: GoPackageInfo
 ): GoSymbolSearchPlan {
+  const filePackageName = parseGoSourcePackageName(goText);
   return {
     symbolName,
     qualifiedName: goPkg ? `${goPkg.packageName}.${symbolName}` : undefined,
     aliases: goPkg?.importPath ? findImportAliases(goText, goPkg.importPath, goPkg.packageName) : [],
-    includeBare: true
+    includeBare: !!goPkg && filePackageName === goPkg.packageName
   };
+}
+
+function parseGoSourcePackageName(goText: string): string | undefined {
+  const { tokens } = tokenizeGo(goText);
+  for (let i = 0; i < tokens.length - 1; i += 1) {
+    if (tokens[i].type === 'identifier' && tokens[i].value === 'package' && tokens[i + 1].type === 'identifier') {
+      return tokens[i + 1].value;
+    }
+  }
+  return undefined;
 }
 
 export function findImportAliases(goText: string, importPath: string, packageName: string): string[] {
@@ -116,6 +117,31 @@ export function findImportAliases(goText: string, importPath: string, packageNam
   }
 
   return Array.from(aliases);
+}
+
+export function findGoImportPathForQualifiedSymbolAtOffset(
+  goText: string,
+  offset: number
+): GoQualifiedImportRef | undefined {
+  const { tokens } = tokenizeGo(goText);
+  for (let i = 0; i < tokens.length - 2; i += 1) {
+    const qualifierToken = tokens[i];
+    const dot = tokens[i + 1];
+    const symbolToken = tokens[i + 2];
+    if (qualifierToken.type !== 'identifier' || dot.value !== '.' || symbolToken.type !== 'identifier') continue;
+    if (offset < symbolToken.startOffset || offset > symbolToken.endOffset) continue;
+
+    const importPath = findImportPathForQualifier(tokens, qualifierToken.value);
+    if (!importPath) return undefined;
+    return {
+      qualifier: qualifierToken.value,
+      symbolName: symbolToken.value,
+      importPath,
+      symbolStartOffset: symbolToken.startOffset,
+      symbolEndOffset: symbolToken.endOffset
+    };
+  }
+  return undefined;
 }
 
 export function findGoSymbolUsagesInText(
@@ -246,6 +272,52 @@ function addImportAlias(
   }
   if (alias === '_' || alias === '.') return;
   aliases.add(alias);
+}
+
+function findImportPathForQualifier(tokens: GoToken[], qualifier: string): string | undefined {
+  for (let i = 0; i < tokens.length; i += 1) {
+    const token = tokens[i];
+    if (token.type !== 'identifier' || token.value !== 'import') continue;
+    const next = tokens[i + 1];
+    if (!next) continue;
+
+    if (next.type === 'string') {
+      if (getImportQualifier(undefined, next.value) === qualifier) return next.value;
+      continue;
+    }
+
+    if ((next.type === 'identifier' || next.value === '.' || next.value === '_') && tokens[i + 2]?.type === 'string') {
+      if (getImportQualifier(next.value, tokens[i + 2].value) === qualifier) return tokens[i + 2].value;
+      continue;
+    }
+
+    if (next.value === '(') {
+      for (let j = i + 2; j < tokens.length && tokens[j].value !== ')'; j += 1) {
+        const current = tokens[j];
+        if (current.type === 'string') {
+          if (getImportQualifier(undefined, current.value) === qualifier) return current.value;
+          continue;
+        }
+        if ((current.type === 'identifier' || current.value === '.' || current.value === '_') && tokens[j + 1]?.type === 'string') {
+          if (getImportQualifier(current.value, tokens[j + 1].value) === qualifier) return tokens[j + 1].value;
+          j += 1;
+        }
+      }
+    }
+  }
+
+  return undefined;
+}
+
+function getImportQualifier(rawAlias: string | undefined, importPath: string): string | undefined {
+  const alias = rawAlias?.trim();
+  if (alias) {
+    if (alias === '_' || alias === '.') return undefined;
+    return alias;
+  }
+
+  const lastSegment = importPath.split('/').filter(Boolean).at(-1);
+  return lastSegment ? lastSegment.replace(/[^A-Za-z0-9_]/g, '_') : undefined;
 }
 
 function findQualifiedSymbolUsages(

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.9 - 2026-04-29
+
+- Fixed VSIX file whitelist so release verification no longer packages unused resources.
+- Limited bare Go symbol usage matches to files in the generated Go package.
+- Allowed Proto compile templates to render when `{protoPackage}` cannot be inferred.
+
 ## 1.0.8 - 2026-04-29
 
 - Split extension lifecycle, configuration, navigation, usage search, compile, diagnostics, and command registration into focused modules.

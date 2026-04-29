@@ -1,6 +1,8 @@
 // Copyright 2026 JumpProto contributors.
 // SPDX-License-Identifier: Apache-2.0
 
+import { toGoExportedName } from './naming';
+
 export type ProtoSymbolKind = 'message' | 'enum' | 'rpc' | 'service' | 'field';
 
 export type ProtoSymbol = {
@@ -38,6 +40,12 @@ export type ProtoBlock = {
   nameEndOffset: number;
   bodyStartOffset: number;
   bodyEndOffset: number;
+};
+
+type QualifiedProtoTypeName = {
+  name: string;
+  startOffset: number;
+  endOffset: number;
 };
 
 const PRIMITIVE_PROTO_TYPES = new Set([
@@ -244,11 +252,12 @@ function findFieldTypeName(
       const token = tokens[i];
       if (token.type !== 'identifier') continue;
       if (PRIMITIVE_PROTO_TYPES.has(token.value)) return undefined;
+      const qualifiedName = readQualifiedTypeNameEndingAt(tokens, i);
       return {
-        name: token.value,
-        goName: resolveProtoMessageGoName(token.value, blocks),
-        startOffset: token.startOffset,
-        endOffset: token.endOffset
+        name: qualifiedName.name,
+        goName: resolveProtoMessageGoName(qualifiedName.name, blocks),
+        startOffset: qualifiedName.startOffset,
+        endOffset: qualifiedName.endOffset
       };
     }
     return undefined;
@@ -257,17 +266,36 @@ function findFieldTypeName(
   if (prev.type !== 'identifier') return undefined;
   if (PRIMITIVE_PROTO_TYPES.has(prev.value)) return undefined;
   if (prev.value === 'repeated' || prev.value === 'optional' || prev.value === 'required') return undefined;
+  const qualifiedName = readQualifiedTypeNameEndingAt(tokens, fieldNameIndex - 1);
   return {
-    name: prev.value,
-    goName: resolveProtoMessageGoName(prev.value, blocks),
-    startOffset: prev.startOffset,
-    endOffset: prev.endOffset
+    name: qualifiedName.name,
+    goName: resolveProtoMessageGoName(qualifiedName.name, blocks),
+    startOffset: qualifiedName.startOffset,
+    endOffset: qualifiedName.endOffset
   };
 }
 
 function resolveProtoMessageGoName(typeName: string, blocks: ProtoBlock[]): string | undefined {
   const matches = blocks.filter(block => block.kind === 'message' && block.name === typeName);
   return matches.length === 1 ? matches[0].fullName : undefined;
+}
+
+function readQualifiedTypeNameEndingAt(tokens: Token[], endIndex: number): QualifiedProtoTypeName {
+  const end = tokens[endIndex];
+  let startIndex = endIndex;
+  while (
+    startIndex >= 2 &&
+    tokens[startIndex - 1]?.value === '.' &&
+    tokens[startIndex - 2]?.type === 'identifier'
+  ) {
+    startIndex -= 2;
+  }
+  if (tokens[startIndex - 1]?.value === '.') startIndex -= 1;
+  return {
+    name: end.value,
+    startOffset: tokens[startIndex].startOffset,
+    endOffset: end.endOffset
+  };
 }
 
 function findMatchingAngleOpenTokenIndex(tokens: Token[], closeIndex: number): number | undefined {
@@ -409,16 +437,4 @@ function isIdentifierPart(ch: string | undefined): boolean {
 
 function isDigit(ch: string | undefined): boolean {
   return !!ch && /[0-9]/.test(ch);
-}
-
-function toGoExportedName(protoName: string): string {
-  const parts = protoName.split('_').filter(Boolean);
-  let out = '';
-  for (let i = 0; i < parts.length; i += 1) {
-    const seg = parts[i];
-    const mapped = seg.length === 0 ? seg : seg[0].toUpperCase() + seg.slice(1);
-    if (i > 0 && /^\d/.test(seg)) out += '_';
-    out += mapped;
-  }
-  return out;
 }

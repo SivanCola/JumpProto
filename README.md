@@ -2,123 +2,121 @@
 
 # JumpProto
 
-### Fast Go and Proto navigation for generated Go projects
+### Go ↔ .proto navigation for generated Go projects
 
-[![version](https://img.shields.io/visual-studio-marketplace/v/SivanLiu.jumpproto?label=version&color=2389d7)](https://marketplace.visualstudio.com/items?itemName=SivanLiu.jumpproto)
-[![open vsx](https://img.shields.io/open-vsx/v/SivanLiu/jumpproto?label=open%20vsx&color=8a63d2)](https://open-vsx.org/extension/SivanLiu/jumpproto)
-![platform](https://img.shields.io/badge/platform-VS%20Code%20%7C%20Cursor-8a8a8a)
-![built with](https://img.shields.io/badge/built%20with-TypeScript-3178c6)
-[![downloads](https://img.shields.io/visual-studio-marketplace/d/SivanLiu.jumpproto?label=downloads&color=39b91f)](https://marketplace.visualstudio.com/items?itemName=SivanLiu.jumpproto)
-[![license](https://img.shields.io/badge/license-Apache--2.0-orange)](LICENSE)
+[![Visual Studio Marketplace](https://img.shields.io/visual-studio-marketplace/v/SivanLiu.jumpproto?label=VS%20Marketplace&color=2389d7)](https://marketplace.visualstudio.com/items?itemName=SivanLiu.jumpproto)
+[![Open VSX](https://img.shields.io/open-vsx/v/SivanLiu/jumpproto?label=Open%20VSX&color=8a63d2)](https://open-vsx.org/extension/SivanLiu/jumpproto)
+![VS Code and Cursor](https://img.shields.io/badge/VS%20Code%20%7C%20Cursor-supported-6f7df6)
+[![License](https://img.shields.io/badge/license-Apache--2.0-orange)](LICENSE)
 
 English | [简体中文](#简体中文)
 
 </div>
 
----
+JumpProto helps Go teams move between generated Go code and the source `.proto` files that produced it. It is useful in repositories where `.pb.go` files, services, and Proto sources live in separate directories and the normal definition flow stops inside generated code.
 
-## English
+Use JumpProto to:
 
-JumpProto connects generated Go code back to its source `.proto` definitions, then helps you move in the other direction when you need to inspect Go usage from a Proto symbol.
+- jump from generated Go symbols back to `message`, `enum`, `service`, `rpc`, nested messages, and fields in `.proto`;
+- find Go usages from a Proto message, enum, RPC, field type, or field name;
+- keep project-level Proto roots and compile rules in `.jumpproto`;
+- run or dry-run the current Proto compile command from the sidebar;
+- diagnose stale or unexpected navigation results without leaving the editor.
 
-Use it to jump from `.pb.go` symbols to `message`, `enum`, `service`, `rpc`, and field definitions, search Go usage from a `.proto` file, and run the current project's Proto compile command from the sidebar.
+## Screenshots
 
-## What's New
+![JumpProto sidebar with Proto roots and compile rule](resources/screenshots/sidebar-overview.png)
 
-- Symbol-level `Go -> .proto` navigation for generated Go code.
-- `.proto -> Go` usage search for definitions, field types, and field names.
-- Sidebar configuration for Proto roots, workspace fallback search, UI language, and Make Proto rules.
-- `Compile Current Proto` command with placeholder-based shell templates.
-- Dry-run command testing, navigation testing, output access, and rendered command preview from the sidebar.
+![Jump from generated Go code to the source Proto definition](resources/screenshots/go-to-proto.png)
 
-## Highlights
+![Find Go usages from a Proto field](resources/screenshots/proto-to-go.png)
 
-- Jump from generated `.pb.go` code to the source `.proto` file.
-- Resolve source files from generated headers such as `// source: path/to/file.proto`.
-- Locate `message`, `enum`, `service`, `rpc`, nested symbols, and fields when possible.
-- Search Go usages from Proto definitions using VS Code's native references view.
-- Search field reads, getter calls, and composite literal fields from a Proto field.
-- Configure multiple `protoRoots` for repositories with separated Go and Proto source trees.
-- Fall back to workspace search when `protoRoots` does not resolve a source file.
-- Edit, test, and run a project-specific Proto compile command from the JumpProto sidebar.
-- Preview the rendered Make Proto command for the active `.proto` file before running it.
-- Test the current cursor's navigation result and open the `JumpProto` output channel from the sidebar.
-- Cache workspace scans and support cancellable usage searches for large repositories.
-- Switch JumpProto UI text between English and Chinese.
+## Install
+
+- [Install from Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=SivanLiu.jumpproto)
+- [Install from Open VSX](https://open-vsx.org/extension/SivanLiu/jumpproto)
+
+After installation, open a Go workspace that contains generated `.pb.go` files and source `.proto` files.
 
 ## Quick Start
 
-1. Install `JumpProto` from the VS Code Marketplace.
-2. Open a Go repository that contains generated `.pb.go` files.
-3. Configure `protoJump.protoRoots` if source `.proto` files live outside the opened workspace.
-4. Put the cursor on a generated Go symbol and press `F12`.
-5. Open the JumpProto sidebar when you need to edit roots or configure the compile rule.
+1. Open the JumpProto view from the Activity Bar.
+2. Add the directory that contains source Proto files, for example `proto_src`.
+3. Open a generated Go file and place the cursor on a generated symbol such as `CreateOrderReq`.
+4. Press `F12`, or run `JumpProto: Jump To Proto`.
+5. Open a `.proto` file and run `JumpProto: Jump To Go` on a message, field, enum, service, or RPC when you need Go usages.
 
-## Navigation Workflow
+If your team wants shared project setup, commit a `.jumpproto` file at the workspace root.
 
-- From Go, run `JumpProto: Go to Proto Definition` or press `F12` on a generated symbol.
-- From Proto, run `JumpProto: Go to Go Usage` on a `message`, `enum`, `service`, `rpc`, field type, or field name.
-- From a `.proto` file, run `JumpProto: Compile Current Proto` after configuring a Make Proto rule.
-- Use the status bar entry while editing Go files as a shortcut to Proto definition navigation.
-- Use the JumpProto Activity Bar sidebar to manage roots, language, workspace search, compile rules, navigation tests, and output logs.
+## Main Workflows
 
-When `gopls` is enabled, VS Code may show both generated Go and Proto definition candidates. Choose the `.proto` candidate when you want the source definition.
+### Go To Proto
 
-## Commands
+JumpProto follows the generated Go definition, reads the generated file header, and opens the matching source `.proto` file.
 
-| Command | What it does |
-| --- | --- |
-| `JumpProto: Go to Proto Definition` | Opens the source `.proto` definition for the generated Go symbol under the cursor. |
-| `JumpProto: Go to Go Usage` | Finds Go usage for the Proto symbol or field under the cursor. |
-| `JumpProto: Compile Current Proto` | Runs the configured shell command template for the active `.proto` file. |
-| `JumpProto: Test Navigation` | Resolves the current cursor target and writes the result to output without jumping. |
-| `JumpProto: Open Output` | Opens the `JumpProto` output channel. |
-| `JumpProto: Diagnose Current Symbol` | Writes detailed navigation diagnostics for the current cursor to output. |
-| `JumpProto: Add Proto Root` | Adds a source `.proto` root directory. |
-| `JumpProto: Remove Proto Root` | Removes a configured source `.proto` root directory. |
-| `JumpProto: Toggle Search In Workspace` | Enables or disables workspace fallback search. |
-| `JumpProto: Select Language` | Switches JumpProto UI text between English and Chinese. |
-| `JumpProto: Edit Make Proto Rule` | Opens settings for `protoJump.makeProtoCommand`. |
-| `JumpProto: Make Proto Rule Help` | Opens the built-in rule guide. |
+```go
+// generated order.pb.go
+// source: api/order.proto
 
-## Settings
+type CreateOrderReq struct {
+    UserId string `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3"`
+}
+```
 
-### `protoJump.protoRoots`
+Put the cursor on `CreateOrderReq` or `UserId` in Go, then use `F12` or `JumpProto: Jump To Proto`.
 
-List of directories that contain source `.proto` files. Multiple roots are supported.
+### Proto To Go
+
+From a `.proto` file, JumpProto searches Go code for common usage forms:
+
+- qualified imports, such as `orderpb.CreateOrderReq`;
+- import aliases;
+- same-package generated Go references;
+- field reads, such as `req.UserId`;
+- getter calls, such as `req.GetUserId()`;
+- composite literal fields, such as `UserId: value`.
+
+Results open in VS Code's native references view.
+
+### Compile Current Proto
+
+Configure a command template once, then run it for the active `.proto` file from the sidebar or command palette.
+
+```bash
+cd {protoSrcRoot} && make api pkg={protoFileNoExt}
+```
+
+Use `Test Command` before compiling. It performs a shell dry run and writes the rendered command to the `JumpProto` output channel.
+
+## Project Config
+
+JumpProto uses `.jumpproto` at the opened workspace root for project-level configuration. This is the recommended setup for teams because roots and compile rules can be shared with the repository.
 
 ```json
 {
-  "protoJump.protoRoots": [
-    "/ABSOLUTE/PATH/TO/your/proto_src",
-    "$HOME/work/shared-proto"
+  "protoRoots": [
+    "proto_src",
+    "../shared-proto"
+  ],
+  "searchInWorkspace": true,
+  "makeProtoCommand": "cd {protoSrcRoot} && make api pkg={protoFileNoExt}",
+  "exclude": [
+    "**/node_modules/**",
+    "**/vendor/**",
+    "**/out/**",
+    "**/dist/**",
+    "**/.git/**"
   ]
 }
 ```
 
-### `protoJump.searchInWorkspace`
+Relative `protoRoots` are resolved from the workspace root. `.jumpproto` values take priority over older `protoJump.*` VS Code settings; missing fields still fall back to those settings for compatibility.
 
-- Type: `boolean`
-- Default: `true`
-- Description: continue searching in the current workspace when `protoRoots` does not resolve a source file.
-
-### `protoJump.makeProtoCommand`
-
-- Type: `string`
-- Default: `""`
-- Description: shell command template used by `Compile Current Proto`.
-
-Example:
-
-```bash
-cd {protoSrcRoot} && make special_proto packagename={protoPackage} filename={protoFileNoExt}
-```
-
-Supported placeholders:
+## Compile Placeholders
 
 | Placeholder | Value |
 | --- | --- |
-| `{workspaceFolder}` | Current workspace root directory. |
+| `{workspaceFolder}` | Current workspace root. |
 | `{protoSrcRoot}` | Matched Proto source root. |
 | `{protoFile}` | Active Proto file path. |
 | `{protoFileNoExt}` | Active Proto file name without `.proto`. |
@@ -126,43 +124,6 @@ Supported placeholders:
 | `{relativeProto}` | Path relative to `protoSrcRoot`, including `.proto`. |
 | `{relativeProtoNoExt}` | Path relative to `protoSrcRoot`, without `.proto`. |
 | `{protoPackage}` | Package segment inferred from `go_package` or `package`. |
-
-### `protoJump.exclude`
-
-- Type: `string[]`
-- Default: `["**/node_modules/**", "**/vendor/**", "**/out/**", "**/dist/**", "**/.git/**"]`
-- Description: glob patterns excluded from JumpProto workspace searches.
-
-Use this to skip generated, vendor, build, or large directories:
-
-```json
-{
-  "protoJump.exclude": [
-    "**/node_modules/**",
-    "**/vendor/**",
-    "**/out/**",
-    "**/dist/**",
-    "**/.git/**",
-    "**/third_party/big_generated/**"
-  ]
-}
-```
-
-### `protoJump.uiLanguage`
-
-- Type: `"zh" | "en"`
-- Default: `"en"`
-- Description: language used by the JumpProto sidebar and notifications.
-
-## Make Proto Rule
-
-The Make Proto rule is designed for repositories where one `.proto` file can be regenerated through a project-specific Makefile or shell script.
-
-Start with a simple template:
-
-```bash
-cd {protoSrcRoot} && make special_proto packagename={protoPackage} filename={protoFileNoExt}
-```
 
 For repositories with multiple compile targets, route by relative path:
 
@@ -175,49 +136,44 @@ cd {protoSrcRoot} && case {relativeProto} in
 esac
 ```
 
-Use `Test Command` in the sidebar before compiling. It performs a shell syntax dry run and writes the rendered command to the `JumpProto` output channel.
+## Commands
 
-When a `.proto` file is active, the sidebar shows the command rendered with the current file context. If the preview is unavailable, confirm the file is under `protoJump.protoRoots` or a detectable `proto_src` directory.
+| Command | What It Does |
+| --- | --- |
+| `JumpProto: Jump To Proto` | Opens the source `.proto` definition for the generated Go symbol under the cursor. |
+| `JumpProto: Jump To Go` | Finds Go usages for the Proto symbol or field under the cursor. |
+| `JumpProto: Compile This Proto` | Runs the configured command template for the active `.proto` file. |
+| `JumpProto: Test Navigation` | Resolves the current cursor target and writes the result to output. |
+| `JumpProto: Diagnose Current Symbol` | Writes detailed navigation diagnostics to output. |
+| `JumpProto: Open Output` | Opens the `JumpProto` output channel. |
+| `JumpProto: Clear Cache` | Clears JumpProto's in-memory navigation and usage caches. |
 
-## Support Boundaries / Troubleshooting
-
-- Go -> Proto depends on VS Code and `gopls` resolving the cursor symbol to a generated `.pb.go` definition first. JumpProto then reads the generated file header and follows `// source: path/to/file.proto`.
-- Proto -> Go usage is static workspace search, not a full Go type-system reference query. It covers common qualified imports, import aliases, same-package bare names, field access, getters, and composite literals.
-- Usage search caches Go file lists, file text, `.pb.go` headers, and inferred Go package data. The cache is cleared when Go/Proto files or `protoJump` settings change.
-- Import aliases, default imports, same-package bare names, nested messages, fields, enums, services, and RPCs are supported for common generated-Go layouts, but dynamic reflection or custom wrappers may still be missed.
-- `Compile Current Proto` determines `{protoSrcRoot}` from configured `protoJump.protoRoots` first, then from detectable `proto_src` ancestors with a `Makefile`.
-- Use `JumpProto: Test Navigation` to check the current cursor without moving editors. Use `JumpProto: Diagnose Current Symbol` when navigation fails; it logs editor context, definition-provider results, source header resolution, proto root candidates, Go package inference, and usage-search strategy to the `JumpProto` output channel.
+The sidebar also provides buttons for Proto roots, Make Proto rules, language switching, theme switching, diagnostics, output, and cache cleanup.
 
 ## Requirements
 
-- Generated Go files should be created by `protoc-gen-go`.
-- Generated file headers must include a source line:
+- Generated Go files should be produced by `protoc-gen-go`.
+- Generated files should contain a source header such as `// source: api/order.proto`.
+- Go-to-Proto navigation works best with the official Go extension and `gopls` enabled.
+- Compile commands run locally through the current system shell.
 
-```go
-// source: path/to/file.proto
-```
+## Limits
 
-- Go definition navigation works best with the official Go extension and `gopls` enabled.
-- `Compile Current Proto` requires the active `.proto` file to be under a configured root or a detectable `proto_src` directory with a `Makefile`.
-
-## Current Limits
-
-- Go-to-Proto navigation depends on VS Code first resolving the Go symbol to a generated `.pb.go` definition.
-- Proto-to-Go usage search is heuristic and capped to keep workspace scans responsive.
-- Usage searches are capped at 200 references and can be cancelled from the progress notification.
-- Field usage search can miss complex aliasing, reflection, generated helper wrappers, or heavily dynamic code.
-- Proto compile commands run locally through `/bin/zsh`.
-- Use `JumpProto: Open Output` to inspect dry-run commands, diagnostics, and navigation test results.
+- Go-to-Proto navigation depends on VS Code first resolving the Go symbol to a generated `.pb.go` or `.pb.gw.go` definition.
+- Proto-to-Go usage search is a static workspace search, not a full Go type-system reference query.
+- Usage search returns up to 200 references and can be cancelled from the progress notification.
+- Field usage search can miss reflection, dynamic code, generated wrappers, or unusual aliasing.
+- JumpProto caches file scans for responsiveness. Cache entries are automatically invalidated on relevant file, config, or workspace changes, and can also be cleared manually from the sidebar.
 
 ## Privacy
 
-JumpProto stores configuration in VS Code or workspace settings and does not send paths, source code, or compile commands to any remote service.
+JumpProto runs locally inside VS Code/Cursor. It does not send paths, source code, Proto files, Go files, or compile commands to any remote service.
 
-Path examples in this README use placeholders such as `/ABSOLUTE/PATH/TO/...` and `$HOME/...` to avoid exposing personal local directory information.
+Path examples in this README use placeholders such as `/workspace/demo-shop`, `/ABSOLUTE/PATH/TO/...`, and `$HOME/...` to avoid exposing personal local directory information.
 
-## Bug Reports
+## Support
 
-Report issues here: <https://github.com/SivanCola/JumpProto/issues>
+Report issues at [github.com/SivanCola/JumpProto/issues](https://github.com/SivanCola/JumpProto/issues).
 
 ## License
 
@@ -229,107 +185,111 @@ JumpProto is licensed under the Apache License, Version 2.0. See [LICENSE](LICEN
 
 ## 简体中文
 
-JumpProto 会把生成后的 Go 代码重新连回源 `.proto` 定义，也能在你查看 Proto 符号时反向查找 Go 侧使用位置。
+JumpProto 帮助 Go 项目在生成后的 Go 代码和源 `.proto` 文件之间来回跳转。它适合 `.pb.go`、业务 Go 代码和 Proto 源码分散在不同目录里的仓库，尤其适合普通定义跳转只停在生成代码里的场景。
 
-你可以从 `.pb.go` 符号跳到 `message`、`enum`、`service`、`rpc` 和字段定义，也可以从 `.proto` 文件里搜索 Go 使用处，并在侧边栏里运行当前项目的 Proto 编译命令。
+你可以用 JumpProto：
 
-## 最新版亮点
+- 从生成 Go 符号跳回 `.proto` 里的 `message`、`enum`、`service`、`rpc`、内部消息和字段；
+- 从 Proto 的 message、enum、RPC、字段类型或字段名反查 Go 使用处；
+- 使用 `.jumpproto` 保存项目级 Proto 根目录和编译规则；
+- 在侧边栏运行或 dry-run 当前 Proto 文件的编译命令；
+- 在跳转结果异常时查看诊断信息并清理缓存。
 
-- 支持生成 Go 代码到 `.proto` 的元素级跳转。
-- 支持从 `.proto` 反查 Go 使用处，覆盖定义、字段类型和字段名。
-- 侧边栏集中管理 Proto 根目录、工作区兜底搜索、界面语言和 Make Proto 规则。
-- `Compile Current Proto` 支持基于占位符的 shell 命令模板。
-- 侧边栏支持 dry-run 测试命令、测试跳转、打开输出和查看展开后的命令预览。
+## 截图
 
-## 功能亮点
+![JumpProto 侧边栏：Proto 根目录与编译规则](resources/screenshots/sidebar-overview.png)
 
-- 从生成的 `.pb.go` 代码跳转到源 `.proto` 文件。
-- 基于生成文件头部的 `// source: path/to/file.proto` 解析源文件。
-- 尽量定位到 `message`、`enum`、`service`、`rpc`、内部元素和字段。
-- 从 Proto 定义出发，在 VS Code 原生引用视图里查看 Go 使用处。
-- 从 Proto 字段查找 Go 里的字段读取、getter 调用和结构体字面量字段。
-- 支持配置多个 `protoRoots`，适配 Go 代码和 Proto 源码分离的仓库。
-- 当 `protoRoots` 未命中时，可继续在当前工作区兜底搜索。
-- 在 JumpProto 侧边栏里编辑、测试并运行项目自己的 Proto 编译命令。
-- 在执行前预览当前 `.proto` 文件展开后的 Make Proto 命令。
-- 从侧边栏测试当前光标的跳转结果，并快速打开 `JumpProto` 输出面板。
-- 缓存工作区扫描，并支持在大仓库里取消 usage 搜索。
-- JumpProto 侧边栏和提示消息支持英文与中文切换。
+![从生成 Go 代码跳转到源 Proto 定义](resources/screenshots/go-to-proto.png)
+
+![从 Proto 字段查找 Go 使用处](resources/screenshots/proto-to-go.png)
+
+## 安装
+
+- [从 Visual Studio Marketplace 安装](https://marketplace.visualstudio.com/items?itemName=SivanLiu.jumpproto)
+- [从 Open VSX 安装](https://open-vsx.org/extension/SivanLiu/jumpproto)
+
+安装后，打开包含生成 `.pb.go` 文件和源 `.proto` 文件的 Go 工作区。
 
 ## 快速开始
 
-1. 从 VS Code Marketplace 安装 `JumpProto`。
-2. 打开包含生成 `.pb.go` 文件的 Go 仓库。
-3. 如果源 `.proto` 文件不在当前工作区内，配置 `protoJump.protoRoots`。
-4. 将光标放在生成 Go 符号上并按 `F12`。
-5. 需要管理根目录或编译规则时，打开 JumpProto 侧边栏。
+1. 从 Activity Bar 打开 JumpProto 侧边栏。
+2. 添加源 Proto 文件所在目录，例如 `proto_src`。
+3. 打开生成 Go 文件，把光标放在 `CreateOrderReq` 这类生成符号上。
+4. 按 `F12`，或执行 `JumpProto: Jump To Proto`。
+5. 打开 `.proto` 文件后，可在 message、字段、enum、service 或 RPC 上执行 `JumpProto: Jump To Go` 查看 Go 使用处。
 
-## 导航工作流
+如果团队需要共享配置，建议把 `.jumpproto` 提交到仓库根目录。
 
-- 在 Go 文件中，执行 `JumpProto: Go to Proto Definition`，或在生成符号上按 `F12`。
-- 在 Proto 文件中，对 `message`、`enum`、`service`、`rpc`、字段类型或字段名执行 `JumpProto: Go to Go Usage`。
-- 在 `.proto` 文件中，配置 Make Proto 规则后执行 `JumpProto: Compile Current Proto`。
-- 编辑 Go 文件时，可以使用状态栏里的 JumpProto 入口快速跳转到 Proto 定义。
-- 使用 Activity Bar 里的 JumpProto 侧边栏管理根目录、语言、工作区搜索、编译规则、跳转测试和输出日志。
+## 主要工作流
 
-启用 `gopls` 时，VS Code 可能同时给出生成 Go 和 Proto 定义候选。需要源定义时，选择 `.proto` 候选即可。
+### Go 跳 Proto
 
-## 命令
+JumpProto 会跟随生成 Go 定义，读取生成文件头部，再打开对应的源 `.proto` 文件。
 
-| 命令 | 作用 |
-| --- | --- |
-| `JumpProto: Go to Proto Definition` | 打开光标下生成 Go 符号对应的源 `.proto` 定义。 |
-| `JumpProto: Go to Go Usage` | 查找光标下 Proto 符号或字段的 Go 使用处。 |
-| `JumpProto: Compile Current Proto` | 按当前 `.proto` 文件上下文运行已配置的 shell 命令模板。 |
-| `JumpProto: Test Navigation` | 解析当前光标的目标并写入输出面板，不执行跳转。 |
-| `JumpProto: Open Output` | 打开 `JumpProto` 输出面板。 |
-| `JumpProto: Diagnose Current Symbol` | 将当前光标的详细诊断信息写入输出面板。 |
-| `JumpProto: Add Proto Root` | 添加源 `.proto` 根目录。 |
-| `JumpProto: Remove Proto Root` | 移除已配置的源 `.proto` 根目录。 |
-| `JumpProto: Toggle Search In Workspace` | 开启或关闭工作区兜底搜索。 |
-| `JumpProto: Select Language` | 在英文和中文之间切换 JumpProto 界面文本。 |
-| `JumpProto: Edit Make Proto Rule` | 打开 `protoJump.makeProtoCommand` 设置。 |
-| `JumpProto: Make Proto Rule Help` | 打开内置规则说明。 |
+```go
+// generated order.pb.go
+// source: api/order.proto
 
-## 配置项
+type CreateOrderReq struct {
+    UserId string `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3"`
+}
+```
 
-### `protoJump.protoRoots`
+把光标放在 Go 里的 `CreateOrderReq` 或 `UserId` 上，然后使用 `F12` 或 `JumpProto: Jump To Proto`。
 
-源 `.proto` 文件所在根目录列表，可配置多个。
+### Proto 查 Go
+
+从 `.proto` 文件出发，JumpProto 会搜索常见 Go 使用方式：
+
+- 带包名引用，例如 `orderpb.CreateOrderReq`；
+- import alias；
+- 同包生成 Go 引用；
+- 字段读取，例如 `req.UserId`；
+- getter 调用，例如 `req.GetUserId()`；
+- 结构体字面量字段，例如 `UserId: value`。
+
+结果会打开在 VS Code 原生引用视图里。
+
+### 编译当前 Proto
+
+配置一次命令模板后，即可从侧边栏或命令面板按当前 `.proto` 文件执行。
+
+```bash
+cd {protoSrcRoot} && make api pkg={protoFileNoExt}
+```
+
+编译前建议先点击 `Test Command`。它只做 shell dry-run，并把展开后的命令写入 `JumpProto` 输出面板。
+
+## 项目配置
+
+JumpProto 推荐使用工作区根目录下的 `.jumpproto` 保存项目级配置。这样团队可以在仓库里共享同一套根目录和编译规则。
 
 ```json
 {
-  "protoJump.protoRoots": [
-    "/ABSOLUTE/PATH/TO/your/proto_src",
-    "$HOME/work/shared-proto"
+  "protoRoots": [
+    "proto_src",
+    "../shared-proto"
+  ],
+  "searchInWorkspace": true,
+  "makeProtoCommand": "cd {protoSrcRoot} && make api pkg={protoFileNoExt}",
+  "exclude": [
+    "**/node_modules/**",
+    "**/vendor/**",
+    "**/out/**",
+    "**/dist/**",
+    "**/.git/**"
   ]
 }
 ```
 
-### `protoJump.searchInWorkspace`
+相对 `protoRoots` 会从工作区根目录解析。`.jumpproto` 优先于旧的 `protoJump.*` VS Code 设置；未声明的字段仍会回退到旧设置，便于兼容已有用户。
 
-- 类型：`boolean`
-- 默认：`true`
-- 说明：当 `protoRoots` 未解析到源文件时，是否继续在当前工作区内搜索。
-
-### `protoJump.makeProtoCommand`
-
-- 类型：`string`
-- 默认：`""`
-- 说明：`Compile Current Proto` 使用的 shell 命令模板。
-
-示例：
-
-```bash
-cd {protoSrcRoot} && make special_proto packagename={protoPackage} filename={protoFileNoExt}
-```
-
-支持的占位符：
+## 编译占位符
 
 | 占位符 | 含义 |
 | --- | --- |
 | `{workspaceFolder}` | 当前工作区根目录。 |
-| `{protoSrcRoot}` | 当前命中的 Proto 源文件根目录。 |
+| `{protoSrcRoot}` | 命中的 Proto 源文件根目录。 |
 | `{protoFile}` | 当前 Proto 文件路径。 |
 | `{protoFileNoExt}` | 当前 Proto 文件名，不含 `.proto`。 |
 | `{protoDir}` | 当前 Proto 文件所在目录。 |
@@ -337,44 +297,7 @@ cd {protoSrcRoot} && make special_proto packagename={protoPackage} filename={pro
 | `{relativeProtoNoExt}` | 相对 `protoSrcRoot` 的路径，不含 `.proto`。 |
 | `{protoPackage}` | 根据 `go_package` 或 `package` 推导出的包名片段。 |
 
-### `protoJump.exclude`
-
-- 类型：`string[]`
-- 默认：`["**/node_modules/**", "**/vendor/**", "**/out/**", "**/dist/**", "**/.git/**"]`
-- 说明：JumpProto 工作区搜索时排除的 glob 规则。
-
-可以用它跳过生成目录、vendor、构建目录或体积很大的目录：
-
-```json
-{
-  "protoJump.exclude": [
-    "**/node_modules/**",
-    "**/vendor/**",
-    "**/out/**",
-    "**/dist/**",
-    "**/.git/**",
-    "**/third_party/big_generated/**"
-  ]
-}
-```
-
-### `protoJump.uiLanguage`
-
-- 类型：`"zh" | "en"`
-- 默认：`"en"`
-- 说明：控制 JumpProto 侧边栏和提示消息语言。
-
-## Make Proto 规则
-
-Make Proto 规则适合用在一个 `.proto` 文件可以通过项目自己的 Makefile 或 shell 脚本重新生成的仓库里。
-
-可以先从简单模板开始：
-
-```bash
-cd {protoSrcRoot} && make special_proto packagename={protoPackage} filename={protoFileNoExt}
-```
-
-如果同一仓库有多套编译目标，可以按相对路径分流：
+同一仓库有多套编译目标时，可以按相对路径分流：
 
 ```bash
 cd {protoSrcRoot} && case {relativeProto} in
@@ -385,49 +308,44 @@ cd {protoSrcRoot} && case {relativeProto} in
 esac
 ```
 
-编译前建议先在侧边栏点击 `Test Command`。它只做 shell 语法 dry-run，并把展开后的命令写入 `JumpProto` 输出面板。
+## 命令
 
-当当前活动文件是 `.proto` 时，侧边栏会展示按当前文件上下文展开后的命令。如果无法预览，请确认该文件位于 `protoJump.protoRoots`，或位于可识别的 `proto_src` 目录下。
+| 命令 | 作用 |
+| --- | --- |
+| `JumpProto: Jump To Proto` | 打开光标下生成 Go 符号对应的源 `.proto` 定义。 |
+| `JumpProto: Jump To Go` | 查找光标下 Proto 符号或字段的 Go 使用处。 |
+| `JumpProto: Compile This Proto` | 按当前 `.proto` 文件上下文运行已配置的命令模板。 |
+| `JumpProto: Test Navigation` | 解析当前光标目标并写入输出面板。 |
+| `JumpProto: Diagnose Current Symbol` | 将当前光标的详细诊断信息写入输出面板。 |
+| `JumpProto: Open Output` | 打开 `JumpProto` 输出面板。 |
+| `JumpProto: Clear Cache` | 清理 JumpProto 的内存跳转和 usage 缓存。 |
 
-## 支持边界 / Troubleshooting
-
-- Go -> Proto 依赖 VS Code 和 `gopls` 先把光标符号解析到生成的 `.pb.go` 定义。JumpProto 再读取生成文件头部，并根据 `// source: path/to/file.proto` 回源。
-- Proto -> Go usage 是静态工作区搜索，不等同于完整 Go 类型系统引用查询。它覆盖常见的带包名引用、import alias、同包裸名、字段访问、getter 和结构体字面量。
-- Usage 搜索会缓存 Go 文件列表、文件内容、`.pb.go` 头部和推断出的 Go package 信息；当 Go/Proto 文件或 `protoJump` 配置变化时会自动失效。
-- import alias、默认 import、同包裸名、nested message、字段、enum、service、rpc 会覆盖常见生成 Go 布局，但反射、动态代码或自定义包装仍可能漏掉。
-- `Compile Current Proto` 会优先从 `protoJump.protoRoots` 判断 `{protoSrcRoot}`，然后尝试识别带 `Makefile` 的 `proto_src` 祖先目录。
-- 使用 `JumpProto: Test Navigation` 可以只检查当前光标解析结果而不跳转。跳转失败时使用 `JumpProto: Diagnose Current Symbol`，它会把编辑器上下文、definition provider 结果、source header 解析、proto root 候选、Go package 推断和 usage 搜索策略写入 `JumpProto` 输出面板。
+侧边栏也提供 Proto 根目录、Make Proto 规则、语言切换、主题切换、诊断、输出和清理缓存入口。
 
 ## 前置条件
 
 - Go 代码应由 `protoc-gen-go` 生成。
-- 生成文件头部需要包含 source 行：
+- 生成文件应包含 `// source: api/order.proto` 这类 source 头部。
+- Go 跳 Proto 推荐配合官方 Go 扩展和 `gopls` 使用。
+- 编译命令会在本机通过当前系统 shell 执行。
 
-```go
-// source: path/to/file.proto
-```
+## 支持边界
 
-- Go 定义跳转推荐配合官方 Go 扩展和 `gopls` 使用。
-- `Compile Current Proto` 要求当前 `.proto` 文件位于已配置根目录下，或位于可识别且包含 `Makefile` 的 `proto_src` 目录下。
-
-## 当前限制
-
-- Go 到 Proto 跳转依赖 VS Code 先把 Go 符号解析到生成的 `.pb.go` 定义。
-- Proto 到 Go 的使用处搜索是启发式扫描，并会限制结果数量以保持响应速度。
-- Usage 搜索最多返回 200 个引用，并可在进度通知里取消。
-- 字段使用处搜索可能漏掉复杂别名、反射、生成辅助包装或高度动态的代码。
-- Proto 编译命令会在本机通过 `/bin/zsh` 执行。
-- 可以用 `JumpProto: Open Output` 查看 dry-run 命令、诊断信息和跳转测试结果。
+- Go 跳 Proto 依赖 VS Code 先把 Go 符号解析到生成的 `.pb.go` 或 `.pb.gw.go` 定义。
+- Proto 查 Go 是静态工作区搜索，不等同于完整 Go 类型系统引用查询。
+- Usage 搜索最多返回 200 个引用，可在进度通知里取消。
+- 字段使用处搜索可能漏掉反射、动态代码、生成包装或复杂别名。
+- JumpProto 会缓存文件扫描以保持响应速度。相关文件、配置或工作区变化时会自动失效，也可以从侧边栏手动清理。
 
 ## 隐私
 
-JumpProto 会把配置保存在 VS Code 或工作区设置中，不会把路径、源代码或编译命令发送到任何远程服务。
+JumpProto 只在 VS Code/Cursor 本地运行，不会把路径、源码、Proto 文件、Go 文件或编译命令发送到任何远程服务。
 
-本文档中的路径示例使用 `/ABSOLUTE/PATH/TO/...` 和 `$HOME/...` 这类占位符，避免暴露个人本地目录信息。
+本文档中的路径示例使用 `/workspace/demo-shop`、`/ABSOLUTE/PATH/TO/...` 和 `$HOME/...` 这类占位符，避免暴露个人本地目录信息。
 
-## Bug 反馈
+## 支持
 
-提交地址：<https://github.com/SivanCola/JumpProto/issues>
+问题反馈请提交到 [github.com/SivanCola/JumpProto/issues](https://github.com/SivanCola/JumpProto/issues)。
 
 ## 许可证
 

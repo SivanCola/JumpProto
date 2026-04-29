@@ -2,6 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import * as vscode from 'vscode';
+import * as path from 'node:path';
+
+export { escapeHtml } from './html';
+export { redactMessagePathsForOutput } from './redaction';
 
 export function makeResolveKey(uri: vscode.Uri, position: vscode.Position): string {
   return `${uri.toString()}::${position.line}:${position.character}`;
@@ -19,13 +23,33 @@ export function escapeForRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-export function escapeHtml(value: string): string {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
+export function redactPathForOutput(filePath: string): string {
+  const normalized = path.normalize(filePath);
+  const workspaceFolder = vscode.workspace.workspaceFolders
+    ?.map(folder => folder.uri.fsPath)
+    .sort((a, b) => b.length - a.length)
+    .find(folderPath => {
+      const normalizedFolder = path.normalize(folderPath);
+      const folderWithSep = normalizedFolder.endsWith(path.sep) ? normalizedFolder : normalizedFolder + path.sep;
+      return normalized === normalizedFolder || normalized.startsWith(folderWithSep);
+    });
+
+  if (workspaceFolder) {
+    const relative = path.relative(workspaceFolder, normalized);
+    return relative ? `$WORKSPACE/${normalizeSlashes(relative)}` : '$WORKSPACE';
+  }
+
+  const home = process.env.HOME;
+  if (home) {
+    const normalizedHome = path.normalize(home);
+    const homeWithSep = normalizedHome.endsWith(path.sep) ? normalizedHome : normalizedHome + path.sep;
+    if (normalized === normalizedHome) return '~';
+    if (normalized.startsWith(homeWithSep)) {
+      return `~/${normalizeSlashes(path.relative(normalizedHome, normalized))}`;
+    }
+  }
+
+  return path.isAbsolute(normalized) ? '/ABSOLUTE/PATH' : normalizeSlashes(normalized);
 }
 
 export function isTextEditor(arg: unknown): arg is vscode.TextEditor {

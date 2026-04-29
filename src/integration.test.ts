@@ -8,6 +8,7 @@ import test from 'node:test';
 
 import { extractProtoPathFromPbGo, findProtoSymbolMatch } from './core';
 import {
+  findGoImportPathForQualifiedSymbolAtOffset,
   findGoCompositeFieldUsagesInText,
   findGoFieldAccessUsagesInText,
   findGoSymbolUsagesInText,
@@ -15,7 +16,13 @@ import {
   findImportAliases,
   parseGoPackageInfo
 } from './goText';
-import { resolveProtoSrcRootPath } from './pathResolver';
+import {
+  resolveGoModuleImportDir,
+  resolveProtoSourceFromWorkspaceFolders,
+  resolveProtoSourceNearGeneratedPath,
+  resolveProtoSrcRootPath
+} from './pathResolver';
+import { inferProtoPackage } from './protoMetadata';
 import { findProtoFieldContextAtOffset } from './protoScanner';
 
 const fixturesRoot = path.join(process.cwd(), 'test', 'fixtures');
@@ -57,6 +64,39 @@ test('fixture resolves proto roots from configured external roots and proto_src 
   assert.equal(resolveProtoSrcRootPath(workspaceProto, []), protoRoot);
 });
 
+test('fixture resolves proto source from generated Go tree sibling proto_src', () => {
+  const generatedGo = path.join(workspaceRoot, 'gen', 'activitypb', 'user_profile.pb.go');
+  assert.equal(
+    resolveProtoSourceNearGeneratedPath('api/activity/user_profile.proto', generatedGo),
+    path.join(protoRoot, 'api', 'activity', 'user_profile.proto')
+  );
+});
+
+test('proto source upward search respects max depth', () => {
+  const generatedGo = path.join('/repo', 'a', 'b', 'c', 'gen', 'activity.pb.go');
+  const protoPath = 'api/activity/user_profile.proto';
+  const expected = path.join('/repo', 'proto_src', protoPath);
+  const exists = (filePath: string) => path.normalize(filePath) === path.normalize(expected);
+
+  assert.equal(resolveProtoSourceNearGeneratedPath(protoPath, generatedGo, exists, 2), undefined);
+  assert.equal(resolveProtoSourceNearGeneratedPath(protoPath, generatedGo, exists, 5), expected);
+});
+
+test('fixture resolves proto source from fixed workspace candidates before glob search', () => {
+  assert.equal(
+    resolveProtoSourceFromWorkspaceFolders('api/activity/user_profile.proto', [workspaceRoot]),
+    path.join(protoRoot, 'api', 'activity', 'user_profile.proto')
+  );
+});
+
+test('fixture resolves local Go import directories through go.mod', () => {
+  const sourceGo = path.join(workspaceRoot, 'service', 'default_import.go');
+  assert.equal(
+    resolveGoModuleImportDir('example.com/project/gen/activitypb', sourceGo),
+    path.join(workspaceRoot, 'gen', 'activitypb')
+  );
+});
+
 test('fixture finds Go usage forms for aliases, default imports, and same-package bare names', () => {
   const proto = readFixture('workspace', 'proto_src', 'api', 'activity', 'user_profile.proto');
   const goPkg = parseGoPackageInfo(proto);
@@ -75,10 +115,47 @@ test('fixture finds Go usage forms for aliases, default imports, and same-packag
   const aliasMatches = findGoSymbolUsagesInText(aliasedUsage, 'UserProfile', goPkg);
   const qualifiedMatches = findGoSymbolUsagesInText(defaultImportUsage, 'UserProfile', goPkg);
   const bareMatches = findGoSymbolUsagesInText(samePackageUsage, 'UserProfile', goPkg);
+  const crossPackageBareMatches = findGoSymbolUsagesInText('package service\n\nvar _ UserProfile\n', 'UserProfile', goPkg);
 
   assert.ok(aliasMatches.some(match => match.kind === 'alias' && match.text.includes('apb.UserProfile')));
   assert.ok(qualifiedMatches.some(match => match.kind === 'qualified' && match.text.includes('activitypb.UserProfile')));
   assert.ok(bareMatches.some(match => match.kind === 'bare' && match.text.includes('&UserProfile')));
+  assert.deepEqual(crossPackageBareMatches, []);
+});
+
+test('fixture resolves import path for qualified Go symbols at cursor', () => {
+  const defaultImportUsage = readFixture('workspace', 'service', 'default_import.go');
+  const defaultOffset = defaultImportUsage.indexOf('activitypb.UserProfile') + 'activitypb.'.length;
+  assert.deepEqual(findGoImportPathForQualifiedSymbolAtOffset(defaultImportUsage, defaultOffset), {
+    qualifier: 'activitypb',
+    symbolName: 'UserProfile',
+    importPath: 'example.com/project/gen/activitypb',
+    symbolStartOffset: defaultImportUsage.indexOf('activitypb.UserProfile') + 'activitypb.'.length,
+    symbolEndOffset: defaultImportUsage.indexOf('activitypb.UserProfile') + 'activitypb.UserProfile'.length
+  });
+
+  const aliasedUsage = readFixture('workspace', 'service', 'user_service.go');
+  const aliasOffset = aliasedUsage.indexOf('apb.UserProfile') + 'apb.'.length;
+  assert.equal(
+    findGoImportPathForQualifiedSymbolAtOffset(aliasedUsage, aliasOffset)?.importPath,
+    'example.com/project/gen/activitypb'
+  );
+});
+
+test('fixture allows proto package inference to be empty for compile templates without protoPackage', () => {
+  assert.equal(inferProtoPackage('syntax = "proto3";\nmessage Standalone {}\n'), '');
+  assert.equal(inferProtoPackage('package api.activity;\nmessage UserProfile {}\n'), 'activity');
+  assert.equal(
+    inferProtoPackage('option go_package = "example.com/project/gen/activitypb;activitypb";\nmessage UserProfile {}\n'),
+    'activitypb'
+  );
+  assert.deepEqual(
+    parseGoPackageInfo('option go_package = "example.com/project/gen/activity-pb" ;\nmessage UserProfile {}\n'),
+    {
+      packageName: 'activity_pb',
+      importPath: 'example.com/project/gen/activity-pb'
+    }
+  );
 });
 
 test('fixture finds structured Go field usages for composites, typed variables, and getters', () => {
@@ -119,6 +196,29 @@ test('fixture derives nested proto field type Go names from the proto scanner', 
     kind: 'fieldType',
     typeName: 'Detail',
     goTypeName: 'UserProfile_Detail'
+  });
+});
+
+test('proto scanner derives package-qualified field type names across the whole type range', () => {
+  const proto = `syntax = "proto3";
+
+message Profile {
+  .shared.user.Detail detail = 1;
+  map<string, shared.user.Detail> detail_by_id = 2;
+}
+`;
+  const prefixOffset = proto.indexOf('shared.user.Detail');
+  const mapOffset = proto.indexOf('shared.user.Detail>') + 'shared.'.length;
+
+  assert.deepEqual(findProtoFieldContextAtOffset(proto, prefixOffset), {
+    kind: 'fieldType',
+    typeName: 'Detail',
+    goTypeName: undefined
+  });
+  assert.deepEqual(findProtoFieldContextAtOffset(proto, mapOffset), {
+    kind: 'fieldType',
+    typeName: 'Detail',
+    goTypeName: undefined
   });
 });
 
