@@ -15,35 +15,18 @@ export type ProtoSymbolMatch = {
   kind: 'message' | 'enum' | 'rpc' | 'service' | 'field';
 };
 
+type MessageBlock = {
+  name: string;
+  fullName: string;
+  startOffset: number;
+  bodyStartOffset: number;
+  bodyEndOffset: number;
+};
+
 export function findProtoSymbolMatch(protoText: string, symbolName: string, containerName?: string): ProtoSymbolMatch | undefined {
   if (containerName) {
-    // Look for field within message
-    const msgRe = new RegExp(`\\bmessage\\s+${escapeForRegex(containerName)}\\s*\\{([\\s\\S]*?)\\}`, 'm');
-    const msgMatch = msgRe.exec(protoText);
-    if (msgMatch) {
-      const msgBody = msgMatch[1];
-      const msgOffset = msgMatch.index + msgMatch[0].indexOf(msgBody);
-      
-      // Look for field name in message body
-      // Fields are usually: [label] type name = tag;
-      // We look for the name followed by '='
-      const fieldRe = new RegExp(`\\b([A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*\\d+`, 'g');
-      let fm: RegExpExecArray | null;
-      while ((fm = fieldRe.exec(msgBody)) !== null) {
-        const protoFieldName = fm[1];
-        // Try exact match or case-insensitive match (since Go uses PascalCase)
-        if (protoFieldName === symbolName || 
-            protoFieldName.toLowerCase() === symbolName.toLowerCase() ||
-            toGoExportedName(protoFieldName) === symbolName) {
-          const start = msgOffset + fm.index;
-          return {
-            startOffset: start,
-            endOffset: start + protoFieldName.length,
-            kind: 'field'
-          };
-        }
-      }
-    }
+    const fieldMatch = findFieldMatchInMessage(protoText, symbolName, containerName);
+    if (fieldMatch) return fieldMatch;
   }
 
   const patterns: Array<{ kind: ProtoSymbolMatch['kind']; re: RegExp }> = [
@@ -62,6 +45,80 @@ export function findProtoSymbolMatch(protoText: string, symbolName: string, cont
     return { startOffset, endOffset, kind };
   }
 
+  return undefined;
+}
+
+function findFieldMatchInMessage(protoText: string, symbolName: string, containerName: string): ProtoSymbolMatch | undefined {
+  const targetMessage = findMessageBlocks(protoText).find(block => block.fullName === containerName || block.name === containerName);
+  if (!targetMessage) return undefined;
+
+  const nestedMessageRanges = findMessageBlocks(protoText)
+    .filter(block => block.startOffset > targetMessage.bodyStartOffset && block.bodyEndOffset < targetMessage.bodyEndOffset)
+    .map(block => ({ start: block.startOffset, end: block.bodyEndOffset + 1 }));
+
+  const msgBody = protoText.slice(targetMessage.bodyStartOffset, targetMessage.bodyEndOffset);
+  const fieldRe = /\b([A-Za-z_][A-Za-z0-9_]*)\s*=\s*\d+/g;
+  let fm: RegExpExecArray | null;
+  while ((fm = fieldRe.exec(msgBody)) !== null) {
+    const start = targetMessage.bodyStartOffset + fm.index;
+    if (nestedMessageRanges.some(range => start >= range.start && start < range.end)) continue;
+
+    const protoFieldName = fm[1];
+    if (
+      protoFieldName === symbolName ||
+      protoFieldName.toLowerCase() === symbolName.toLowerCase() ||
+      toGoExportedName(protoFieldName) === symbolName
+    ) {
+      return {
+        startOffset: start,
+        endOffset: start + protoFieldName.length,
+        kind: 'field'
+      };
+    }
+  }
+
+  return undefined;
+}
+
+function findMessageBlocks(protoText: string): MessageBlock[] {
+  const declRe = /\bmessage\s+([A-Za-z_][A-Za-z0-9_]*)\s*\{/g;
+  const rawBlocks: Array<Omit<MessageBlock, 'fullName'>> = [];
+  let match: RegExpExecArray | null;
+
+  while ((match = declRe.exec(protoText)) !== null) {
+    const openBrace = protoText.indexOf('{', match.index);
+    if (openBrace < 0) continue;
+    const closeBrace = findMatchingBrace(protoText, openBrace);
+    if (closeBrace === undefined) continue;
+
+    rawBlocks.push({
+      name: match[1],
+      startOffset: match.index,
+      bodyStartOffset: openBrace + 1,
+      bodyEndOffset: closeBrace
+    });
+  }
+
+  const blocks: MessageBlock[] = rawBlocks.map(block => ({ ...block, fullName: block.name }));
+  for (const block of blocks) {
+    const parent = blocks
+      .filter(candidate => candidate.startOffset < block.startOffset && candidate.bodyEndOffset > block.startOffset)
+      .sort((a, b) => b.startOffset - a.startOffset)[0];
+    block.fullName = parent ? `${parent.fullName}_${block.name}` : block.name;
+  }
+  return blocks;
+}
+
+function findMatchingBrace(text: string, openBraceOffset: number): number | undefined {
+  let depth = 0;
+  for (let i = openBraceOffset; i < text.length; i += 1) {
+    const ch = text[i];
+    if (ch === '{') depth += 1;
+    if (ch === '}') {
+      depth -= 1;
+      if (depth === 0) return i;
+    }
+  }
   return undefined;
 }
 

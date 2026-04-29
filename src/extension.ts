@@ -16,6 +16,17 @@ type ResolveResult = {
   targetRange: vscode.Range;
 };
 
+type GoPackageInfo = {
+  packageName: string;
+  importPath?: string;
+};
+
+type GoUsage = {
+  uri: vscode.Uri;
+  range: vscode.Range;
+  preview: string;
+};
+
 const resolvingKeys = new Set<string>();
 const execFile = promisify(execFileCb);
 
@@ -26,7 +37,7 @@ function makeResolveKey(uri: vscode.Uri, position: vscode.Position): string {
 function getConfig() {
   const config = vscode.workspace.getConfiguration('protoJump');
   return {
-    protoRoots: (config.get<string[]>('protoRoots') ?? []).filter(Boolean),
+    protoRoots: (config.get<string[]>('protoRoots') ?? []).map(normalizeConfigPath).filter(Boolean),
     searchInWorkspace: config.get<boolean>('searchInWorkspace') ?? true,
     makeProtoCommand: (config.get<string>('makeProtoCommand') ?? '').trim()
   };
@@ -47,7 +58,26 @@ function shellQuote(value: string): string {
   return `'${value.replaceAll("'", `'\\''`)}'`;
 }
 
+function normalizeConfigPath(configPath: string): string {
+  const trimmed = configPath.trim();
+  if (!trimmed) return '';
+  const home = process.env.HOME;
+  const expanded = home
+    ? trimmed.replace(/^\$HOME(?=$|[\\/])/, home).replace(/^~(?=$|[\\/])/, home)
+    : trimmed;
+  return path.normalize(expanded);
+}
+
 function resolveProtoSrcRoot(protoFile: string): string | undefined {
+  const normalizedProtoFile = path.normalize(protoFile);
+  const matchingConfiguredRoots = getConfig().protoRoots
+    .filter(root => {
+      const rootWithSep = root.endsWith(path.sep) ? root : root + path.sep;
+      return normalizedProtoFile === root || normalizedProtoFile.startsWith(rootWithSep);
+    })
+    .sort((a, b) => b.length - a.length);
+  if (matchingConfiguredRoots.length > 0) return matchingConfiguredRoots[0];
+
   let current = path.dirname(protoFile);
   while (true) {
     if (path.basename(current) === 'proto_src' && fs.existsSync(path.join(current, 'Makefile'))) {
@@ -153,12 +183,38 @@ function buildProtoSourceCandidates(protoFsPath: string): string[] {
   return Array.from(candidates).filter(Boolean);
 }
 
-async function resolveGoPackageForProtoFile(protoDoc: vscode.TextDocument): Promise<string | undefined> {
+function parseGoPackageInfo(protoText: string): GoPackageInfo | undefined {
+  const goPackageMatch = protoText.match(/^\s*option\s+go_package\s*=\s*"([^"]+)";/m);
+  if (!goPackageMatch) return undefined;
+
+  const value = goPackageMatch[1].trim();
+  if (!value) return undefined;
+  if (value.includes(';')) {
+    const [importPath, packageName] = value.split(';');
+    const trimmedPackageName = packageName?.trim();
+    if (!trimmedPackageName) return undefined;
+    return {
+      packageName: trimmedPackageName,
+      importPath: importPath.trim() || undefined
+    };
+  }
+
+  const parts = value.split('/');
+  const packageName = parts[parts.length - 1]?.trim();
+  if (!packageName) return undefined;
+  return {
+    packageName,
+    importPath: value.includes('/') ? value : undefined
+  };
+}
+
+async function resolveGoPackageInfoForProtoFile(protoDoc: vscode.TextDocument): Promise<GoPackageInfo | undefined> {
   const strictCandidates = buildProtoSourceCandidates(protoDoc.uri.fsPath);
   const basenameCandidate = normalizeSlashes(path.basename(protoDoc.uri.fsPath));
   const exclude = '**/{node_modules,vendor,out,dist,.git}/**';
   const pbGos = await vscode.workspace.findFiles('**/*.pb.go', exclude, 5000);
   const basenameMatchedPackages: string[] = [];
+  const declaredInfo = parseGoPackageInfo(protoDoc.getText());
 
   for (const uri of pbGos) {
     let header: string;
@@ -179,30 +235,26 @@ async function resolveGoPackageForProtoFile(protoDoc: vscode.TextDocument): Prom
     }
 
     const pkgMatch = header.match(/^package\s+([A-Za-z_][A-Za-z0-9_]*)/m);
-    if (pkgMatch) return pkgMatch[1];
+    if (pkgMatch) return { packageName: pkgMatch[1], importPath: declaredInfo?.importPath };
   }
 
-  if (basenameMatchedPackages.length === 1) return basenameMatchedPackages[0];
-
-  const goPackageMatch = protoDoc.getText().match(/^\s*option\s+go_package\s*=\s*"([^"]+)";/m);
-  if (goPackageMatch) {
-    const value = goPackageMatch[1];
-    if (value.includes(';')) {
-      const pkg = value.split(';').pop()?.trim();
-      if (pkg) return pkg;
-    }
-    const parts = value.split('/');
-    const tail = parts[parts.length - 1];
-    if (tail) return tail.trim();
+  if (basenameMatchedPackages.length === 1) {
+    return { packageName: basenameMatchedPackages[0], importPath: declaredInfo?.importPath };
   }
+
+  if (declaredInfo) return declaredInfo;
 
   const protoPackageMatch = protoDoc.getText().match(/^\s*package\s+([A-Za-z_][A-Za-z0-9_.]*)\s*;/m);
   if (protoPackageMatch) {
     const seg = protoPackageMatch[1].split('.').pop()?.trim();
-    if (seg) return seg;
+    if (seg) return { packageName: seg };
   }
 
   return undefined;
+}
+
+async function resolveGoPackageForProtoFile(protoDoc: vscode.TextDocument): Promise<string | undefined> {
+  return (await resolveGoPackageInfoForProtoFile(protoDoc))?.packageName;
 }
 
 function getProtoDefinitionNameAtPosition(doc: vscode.TextDocument, pos: vscode.Position): string | undefined {
@@ -212,7 +264,7 @@ function getProtoDefinitionNameAtPosition(doc: vscode.TextDocument, pos: vscode.
   const name = doc.getText(wordRange);
   if (!name) return undefined;
   const line = doc.lineAt(pos.line).text;
-  const re = new RegExp(`\\b(message|enum|service)\\s+${escapeForRegex(name)}\\b`);
+  const re = new RegExp(`\\b(message|enum|service|rpc)\\s+${escapeForRegex(name)}\\b`);
   if (!re.test(line)) return undefined;
   return name;
 }
@@ -332,7 +384,7 @@ async function pickProtoDefinitionName(editor: vscode.TextEditor, strings: Retur
   const doc = editor.document;
   if (!doc.uri.fsPath.endsWith('.proto')) return undefined;
 
-  const regex = /^\s*(message|enum|service)\s+([A-Za-z_][A-Za-z0-9_]*)\b/;
+  const regex = /^\s*(message|enum|service|rpc)\s+([A-Za-z_][A-Za-z0-9_]*)\b/;
   const candidates: Array<{ kind: string; name: string; line: number }> = [];
 
   const symbols = await vscode.commands.executeCommand<unknown>('vscode.executeDocumentSymbolProvider', doc.uri);
@@ -384,7 +436,7 @@ async function pickProtoDefinitionName(editor: vscode.TextEditor, strings: Retur
 }
 
 function findProtoDefinitionPosition(doc: vscode.TextDocument, name: string): vscode.Position | undefined {
-  const re = new RegExp(`\\b(message|enum|service)\\s+${escapeForRegex(name)}\\b`);
+  const re = new RegExp(`\\b(message|enum|service|rpc)\\s+${escapeForRegex(name)}\\b`);
   for (let i = 0; i < doc.lineCount; i += 1) {
     const line = doc.lineAt(i).text;
     const m = re.exec(line);
@@ -432,6 +484,24 @@ function mergeLocations(primary: vscode.Location[], secondary: vscode.Location[]
   return out;
 }
 
+function goUsageKey(usage: GoUsage): string {
+  return `${usage.uri.toString()}#${usage.range.start.line}:${usage.range.start.character}-${usage.range.end.line}:${usage.range.end.character}`;
+}
+
+function mergeGoUsageResults(...groups: GoUsage[][]): GoUsage[] {
+  const out: GoUsage[] = [];
+  const seen = new Set<string>();
+  for (const group of groups) {
+    for (const usage of group) {
+      const key = goUsageKey(usage);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(usage);
+    }
+  }
+  return out;
+}
+
 async function showReferencesNative(
   sourceUri: vscode.Uri,
   sourcePos: vscode.Position,
@@ -440,13 +510,46 @@ async function showReferencesNative(
   await vscode.commands.executeCommand('editor.action.showReferences', sourceUri, sourcePos, locations);
 }
 
+function collectRegexMatchesInText(
+  uri: vscode.Uri,
+  text: string,
+  regexes: RegExp[],
+  results: GoUsage[],
+  maxResults: number
+): boolean {
+  const lines = text.split('\n');
+  for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
+    const line = lines[lineIndex];
+    for (const re of regexes) {
+      re.lastIndex = 0;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(line)) !== null) {
+        const start = m.index ?? 0;
+        const length = m[0]?.length ?? 0;
+        results.push({
+          uri,
+          range: new vscode.Range(
+            new vscode.Position(lineIndex, start),
+            new vscode.Position(lineIndex, start + length)
+          ),
+          preview: line.replace(/\s+/g, ' ').trim()
+        });
+        if (results.length >= maxResults) return true;
+        if (length === 0) break;
+      }
+      if (results.length >= maxResults) return true;
+    }
+  }
+  return false;
+}
+
 async function findGoUsagesInWorkspaceByRegexes(
   regexes: RegExp[],
   maxResults: number,
   filePredicate?: (uri: vscode.Uri, text: string) => boolean
-): Promise<Array<{ uri: vscode.Uri; range: vscode.Range; preview: string }>> {
+): Promise<GoUsage[]> {
   const exclude = '**/{node_modules,vendor,out,dist,.git}/**';
-  const results: Array<{ uri: vscode.Uri; range: vscode.Range; preview: string }> = [];
+  const results: GoUsage[] = [];
   const uris = await vscode.workspace.findFiles('**/*.go', exclude, 5000);
 
   for (const uri of uris) {
@@ -459,29 +562,7 @@ async function findGoUsagesInWorkspaceByRegexes(
       continue;
     }
     if (filePredicate && !filePredicate(uri, text)) continue;
-    const lines = text.split('\n');
-    for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
-      const line = lines[lineIndex];
-      for (const re of regexes) {
-        re.lastIndex = 0;
-        let m: RegExpExecArray | null;
-        while ((m = re.exec(line)) !== null) {
-          const start = m.index ?? 0;
-          const length = m[0]?.length ?? 0;
-          results.push({
-            uri,
-            range: new vscode.Range(
-              new vscode.Position(lineIndex, start),
-              new vscode.Position(lineIndex, start + length)
-            ),
-            preview: line.replace(/\s+/g, ' ').trim()
-          });
-          if (results.length >= maxResults) return results;
-          if (length === 0) break;
-        }
-        if (results.length >= maxResults) return results;
-      }
-    }
+    if (collectRegexMatchesInText(uri, text, regexes, results, maxResults)) return results;
   }
 
   return results;
@@ -490,26 +571,96 @@ async function findGoUsagesInWorkspaceByRegexes(
 async function findGoUsagesInWorkspace(
   symbolName: string,
   filePredicate?: (uri: vscode.Uri, text: string) => boolean
-): Promise<Array<{ uri: vscode.Uri; range: vscode.Range; preview: string }>> {
+): Promise<GoUsage[]> {
   const re = new RegExp(`\\b${escapeForRegex(symbolName)}\\b`, 'g');
   return findGoUsagesInWorkspaceByRegexes([re], 200, filePredicate);
+}
+
+function findImportAliases(goText: string, importPath: string, packageName: string): string[] {
+  const aliases = new Set<string>();
+  const addAlias = (rawAlias: string | undefined, rawPath: string | undefined) => {
+    if (rawPath !== importPath) return;
+    const alias = rawAlias?.trim();
+    if (!alias) {
+      aliases.add(packageName);
+      return;
+    }
+    if (alias === '_' || alias === '.') return;
+    aliases.add(alias);
+  };
+
+  const singleImportRe = /^\s*import\s+(?:(\w+|\.|_)\s+)?"([^"]+)"/gm;
+  let singleMatch: RegExpExecArray | null;
+  while ((singleMatch = singleImportRe.exec(goText)) !== null) {
+    addAlias(singleMatch[1], singleMatch[2]);
+  }
+
+  const importBlockRe = /^\s*import\s*\(([\s\S]*?)^\s*\)/gm;
+  let blockMatch: RegExpExecArray | null;
+  while ((blockMatch = importBlockRe.exec(goText)) !== null) {
+    const body = blockMatch[1];
+    const lineRe = /^\s*(?:(\w+|\.|_)\s+)?"([^"]+)"/gm;
+    let lineMatch: RegExpExecArray | null;
+    while ((lineMatch = lineRe.exec(body)) !== null) {
+      addAlias(lineMatch[1], lineMatch[2]);
+    }
+  }
+
+  return Array.from(aliases);
+}
+
+async function findGoImportAliasUsages(
+  goPkg: GoPackageInfo,
+  symbolName: string,
+  maxResults: number
+): Promise<GoUsage[]> {
+  if (!goPkg.importPath) return [];
+
+  const exclude = '**/{node_modules,vendor,out,dist,.git}/**';
+  const results: GoUsage[] = [];
+  const uris = await vscode.workspace.findFiles('**/*.go', exclude, 5000);
+
+  for (const uri of uris) {
+    const base = path.basename(uri.fsPath);
+    if (base.endsWith('.pb.go') || base.endsWith('.pb.gw.go') || base.includes('.pb.')) continue;
+    let text: string;
+    try {
+      text = fs.readFileSync(uri.fsPath, 'utf8');
+    } catch {
+      continue;
+    }
+    if (!text.includes(goPkg.importPath) || !text.includes(symbolName)) continue;
+
+    const aliases = findImportAliases(text, goPkg.importPath, goPkg.packageName);
+    if (aliases.length === 0) continue;
+    const regexes = aliases.map(alias => new RegExp(`\\b${escapeForRegex(alias)}\\.${escapeForRegex(symbolName)}\\b`, 'g'));
+    if (collectRegexMatchesInText(uri, text, regexes, results, maxResults)) return results;
+  }
+
+  return results;
 }
 
 async function findGoUsagesPreferQualifiedName(
   protoDoc: vscode.TextDocument,
   symbolName: string
-): Promise<Array<{ uri: vscode.Uri; range: vscode.Range; preview: string }>> {
-  const goPkg = await resolveGoPackageForProtoFile(protoDoc);
+): Promise<GoUsage[]> {
+  const goPkg = await resolveGoPackageInfoForProtoFile(protoDoc);
+  let exactMatches: GoUsage[] = [];
+  let aliasMatches: GoUsage[] = [];
   if (goPkg) {
-    const qualifiedName = `${goPkg}.${symbolName}`;
-    const exactMatches = await findGoUsagesInWorkspaceByRegexes(
+    const qualifiedName = `${goPkg.packageName}.${symbolName}`;
+    exactMatches = await findGoUsagesInWorkspaceByRegexes(
       [new RegExp(`\\b${escapeForRegex(qualifiedName)}\\b`, 'g')],
       200,
       (_uri, text) => text.includes(qualifiedName)
     );
-    if (exactMatches.length > 0) return exactMatches;
+    aliasMatches = await findGoImportAliasUsages(goPkg, symbolName, 200);
   }
-  return findGoUsagesInWorkspace(symbolName);
+  const bareMatches = await findGoUsagesInWorkspaceByRegexes(
+    [new RegExp(`(?<!\\.)\\b${escapeForRegex(symbolName)}\\b`, 'g')],
+    200
+  );
+  return mergeGoUsageResults(exactMatches, aliasMatches, bareMatches).slice(0, 200);
 }
 
 async function findGoCompositeFieldUsages(

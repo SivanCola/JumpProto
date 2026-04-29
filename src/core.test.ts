@@ -32,3 +32,19 @@ test('findProtoSymbolMatch matches go field names that preserve underscore befor
   assert.equal(m?.kind, 'field');
   assert.equal(proto.slice(m!.startOffset, m!.endOffset), 'show_task_5');
 });
+
+test('findProtoSymbolMatch finds fields after nested declarations', () => {
+  const proto = `message Outer {\n  message Inner {\n    string nested = 1;\n  }\n  string target_field = 2;\n}\n`;
+  const m = findProtoSymbolMatch(proto, 'TargetField', 'Outer');
+  assert.ok(m);
+  assert.equal(m?.kind, 'field');
+  assert.equal(proto.slice(m!.startOffset, m!.endOffset), 'target_field');
+});
+
+test('findProtoSymbolMatch maps generated nested Go container names to proto messages', () => {
+  const proto = `message Outer {\n  message Inner {\n    string target_field = 1;\n  }\n}\n`;
+  const m = findProtoSymbolMatch(proto, 'TargetField', 'Outer_Inner');
+  assert.ok(m);
+  assert.equal(m?.kind, 'field');
+  assert.equal(proto.slice(m!.startOffset, m!.endOffset), 'target_field');
+});
