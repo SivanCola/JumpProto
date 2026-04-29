@@ -4,28 +4,29 @@
   "description": "在 Go 与 .proto 之间双向跳转，支持字段与内部元素级精确定位。",
   "version": "1.0.8",
   "icon": "resources/marketplace-icon.png",
+  "files": [
+    "out",
+    "resources",
+    "package.json",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "NOTICE",
+    "THIRD_PARTY_NOTICES.md"
+  ],
   "publisher": "SivanLiu",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/SivanCola/JumpProto.git"
   },
+  "homepage": "https://github.com/SivanCola/JumpProto#readme",
   "bugs": {
     "url": "https://github.com/SivanCola/JumpProto/issues"
   },
   "engines": {
     "vscode": "^1.70.0"
   },
-  "files": [
-    "out/**",
-    "resources/proto-jump-icon.svg",
-    "resources/marketplace-icon.png",
-    "package.json",
-    "README.md",
-    "LICENSE",
-    "NOTICE",
-    "THIRD_PARTY_NOTICES.md"
-  ],
   "categories": [
     "Programming Languages",
     "Other"
@@ -58,6 +59,9 @@
     "onCommand:protoJump.editMakeProtoRule",
     "onCommand:protoJump.openMakeProtoRuleHelp",
     "onCommand:protoJump.compileCurrentProto",
+    "onCommand:protoJump.diagnoseCurrentSymbol",
+    "onCommand:protoJump.testNavigation",
+    "onCommand:protoJump.openOutput",
     "onView:protoJump.view"
   ],
   "main": "./out/extension.js",
@@ -106,6 +110,18 @@
       {
         "command": "protoJump.compileCurrentProto",
         "title": "JumpProto: Compile Current Proto"
+      },
+      {
+        "command": "protoJump.diagnoseCurrentSymbol",
+        "title": "JumpProto: Diagnose Current Symbol"
+      },
+      {
+        "command": "protoJump.testNavigation",
+        "title": "JumpProto: Test Navigation"
+      },
+      {
+        "command": "protoJump.openOutput",
+        "title": "JumpProto: Open Output"
       }
     ],
     "menus": {
@@ -124,6 +140,11 @@
           "command": "protoJump.compileCurrentProto",
           "when": "editorTextFocus && resourceExtname == .proto",
           "group": "navigation@52"
+        },
+        {
+          "command": "protoJump.diagnoseCurrentSymbol",
+          "when": "editorTextFocus && (editorLangId == go || resourceExtname == .proto)",
+          "group": "navigation@53"
         }
       ],
       "view/item/context": []
@@ -176,16 +197,35 @@
           "type": "string",
           "default": "",
           "description": "Shell command template used to compile the current .proto file. Supported placeholders: {workspaceFolder}, {protoSrcRoot}, {protoFile}, {protoFileNoExt}, {protoDir}, {relativeProto}, {relativeProtoNoExt}, {protoPackage}."
+        },
+        "protoJump.exclude": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "**/node_modules/**",
+            "**/vendor/**",
+            "**/out/**",
+            "**/dist/**",
+            "**/.git/**"
+          ],
+          "description": "Glob patterns excluded from JumpProto workspace searches. Use this to skip generated, vendor, build, or large directories."
         }
       }
     }
   },
   "scripts": {
     "compile": "tsc -p .",
+    "build": "npm run compile",
+    "lint": "tsc -p . --noEmit",
     "dev": "npm run watch",
     "dev:host": "code --extensionDevelopmentPath=.",
     "reinstall:vsix": "npm run vsix && code --install-extension dist/JumpProto.vsix --force",
     "vsix": "npm run compile && node -e \"require('fs').mkdirSync('dist',{recursive:true})\" && npx @vscode/vsce package --out dist/JumpProto.vsix",
+    "release:verify": "node scripts/verify-release.mjs",
+    "release:verify:metadata": "node scripts/verify-release.mjs --skip-vsix",
+    "release:check": "npm run release:verify:metadata && npm test && npm run vsix && npm run release:verify",
     "test": "npm run compile && node --test out/*.test.js",
     "watch": "tsc -watch -p .",
     "vscode:prepublish": "npm run compile"

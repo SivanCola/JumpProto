@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package api.activity;
+
+option go_package = "example.com/project/gen/activitypb;activitypb";
+
+message UserProfile {
+  message Detail {
+    string nick_name = 1;
+  }
+
+  string user_name = 1;
+  int32 age = 2;
+  Status status = 3;
+  Detail detail = 4;
+}
+
+enum Status {
+  STATUS_UNKNOWN = 0;
+  STATUS_ACTIVE = 1;
+}
+
+service UserService {
+  rpc GetUserProfile (UserProfile) returns (UserProfile);
+}

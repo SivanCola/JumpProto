@@ -3,6 +3,11 @@
 
 import * as vscode from 'vscode';
 
+import {
+  getMakeProtoTemplateValues,
+  previewMakeProtoCommand,
+  resolveProtoCompileContext
+} from './compile';
 import { getStrings, getUiLanguage } from './i18n';
 
 function getConfig() {
@@ -28,6 +33,10 @@ type ViewMessage =
   | { type: 'removeProtoRoot'; rootPath: string }
   | { type: 'toggleSearchInWorkspace' }
   | { type: 'selectLanguage' }
+  | { type: 'testNavigation' }
+  | { type: 'openOutput' }
+  | { type: 'compileCurrentProto' }
+  | { type: 'diagnoseCurrentSymbol' }
   | { type: 'openMakeProtoRuleHelp' }
   | { type: 'openMakeProtoRuleJson' }
   | { type: 'testMakeProtoRule'; value: string }
@@ -62,6 +71,18 @@ export class ProtoJumpViewProvider implements vscode.WebviewViewProvider {
         case 'selectLanguage':
           void vscode.commands.executeCommand('protoJump.selectLanguage');
           break;
+        case 'testNavigation':
+          void vscode.commands.executeCommand('protoJump.testNavigation');
+          break;
+        case 'openOutput':
+          void vscode.commands.executeCommand('protoJump.openOutput');
+          break;
+        case 'compileCurrentProto':
+          void vscode.commands.executeCommand('protoJump.compileCurrentProto');
+          break;
+        case 'diagnoseCurrentSymbol':
+          void vscode.commands.executeCommand('protoJump.diagnoseCurrentSymbol');
+          break;
         case 'openMakeProtoRuleHelp':
           void vscode.commands.executeCommand('protoJump.openMakeProtoRuleHelp');
           break;
@@ -85,6 +106,16 @@ export class ProtoJumpViewProvider implements vscode.WebviewViewProvider {
     const strings = getStrings();
     const language = getUiLanguage();
     const { protoRoots, searchInWorkspace, makeProtoCommand } = getConfig();
+    const activeDoc = vscode.window.activeTextEditor?.document;
+    const compileCtx = activeDoc ? resolveProtoCompileContext(activeDoc) : undefined;
+    const templateValues = compileCtx ? getMakeProtoTemplateValues(compileCtx) : undefined;
+    const preview = previewMakeProtoCommand(makeProtoCommand, activeDoc);
+    const renderedPreview = preview.rendered
+      ?? (preview.reason === 'empty'
+        ? strings.makeProtoRuleUnset
+        : preview.reason === 'unresolvedContext'
+          ? strings.renderedCommandPreviewNeedContext
+          : strings.renderedCommandPreviewNeedProto);
     const nonce = String(Date.now());
     const removeLabel = language === 'zh' ? '移除' : 'Remove';
 
@@ -381,6 +412,30 @@ export class ProtoJumpViewProvider implements vscode.WebviewViewProvider {
       overflow: hidden;
     }
 
+    .rendered-preview {
+      padding: 10px 11px;
+      border-radius: 10px;
+      border: 1px solid var(--line-soft);
+      background: color-mix(in srgb, var(--panel) 84%, transparent);
+    }
+
+    .rendered-preview-label {
+      margin-bottom: 6px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 650;
+    }
+
+    .rendered-preview code {
+      display: block;
+      color: var(--input-fg);
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
     .list-item {
       display: grid;
       grid-template-columns: 1fr auto;
@@ -467,6 +522,20 @@ export class ProtoJumpViewProvider implements vscode.WebviewViewProvider {
 
     <section class="panel">
       <div class="panel-head">
+        <h2 class="panel-title">${escapeHtml(strings.actions)}</h2>
+      </div>
+      <div class="panel-body">
+        <div class="button-row rule-actions">
+          <button id="testNavigation" class="button">${escapeHtml(strings.testNavigation)}</button>
+          <button id="openOutput" class="button ghost">${escapeHtml(strings.openOutput)}</button>
+          <button id="compileCurrentProto" class="button ghost">${escapeHtml(strings.compileCurrentProto)}</button>
+          <button id="diagnoseCurrentSymbol" class="button ghost">${escapeHtml(strings.diagnoseCurrentSymbol)}</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
         <h2 class="panel-title">${escapeHtml(strings.protoRoots)}</h2>
       </div>
       <div class="panel-body">
@@ -499,6 +568,11 @@ export class ProtoJumpViewProvider implements vscode.WebviewViewProvider {
           <button id="openMakeProtoRuleJson" class="button ghost">${escapeHtml(strings.openJson)}</button>
         </div>
 
+        <div class="rendered-preview">
+          <div class="rendered-preview-label">${escapeHtml(strings.renderedCommandPreview)}</div>
+          <code id="renderedMakeProtoPreview">${escapeHtml(renderedPreview)}</code>
+        </div>
+
         <div class="hint"><span class="kbd">Ctrl/Cmd + Enter</span> ${language === 'zh' ? '快速保存' : 'Quick Save'} · <span class="kbd">Esc</span> ${language === 'zh' ? '取消编辑' : 'Cancel Edit'}</div>
       </div>
     </section>
@@ -506,8 +580,19 @@ export class ProtoJumpViewProvider implements vscode.WebviewViewProvider {
 
   <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
+    const templateValues = ${JSON.stringify(templateValues ?? null)};
+    const shellQuote = (value) => "'" + String(value).replaceAll("'", "'\\\\''") + "'";
+    const renderTemplate = (template) => {
+      const rule = template.trim();
+      if (!rule) return ${JSON.stringify(strings.makeProtoRuleUnset)};
+      if (!templateValues) return ${JSON.stringify(preview.reason === 'unresolvedContext' ? strings.renderedCommandPreviewNeedContext : strings.renderedCommandPreviewNeedProto)};
+      return Object.entries(templateValues).reduce((out, [key, value]) => {
+        return out.replaceAll('{' + key + '}', shellQuote(value));
+      }, rule);
+    };
     const input = document.getElementById('makeProtoRuleInput');
     const preview = document.getElementById('rulePreview');
+    const renderedPreview = document.getElementById('renderedMakeProtoPreview');
     const shell = document.querySelector('.editor-shell');
     const editBtn = document.getElementById('editMakeProtoRule');
     const saveBtn = document.getElementById('saveMakeProtoRule');
@@ -535,6 +620,7 @@ export class ProtoJumpViewProvider implements vscode.WebviewViewProvider {
       status.classList.toggle('dirty', dirty);
       saveBtn.disabled = !isEditing;
       preview.textContent = input.value.trim() || ${JSON.stringify(strings.makeProtoRuleUnset)};
+      renderedPreview.textContent = renderTemplate(input.value);
     };
 
     const submitSave = () => {
@@ -589,6 +675,22 @@ export class ProtoJumpViewProvider implements vscode.WebviewViewProvider {
 
     document.getElementById('openMakeProtoRuleHelp')?.addEventListener('click', () => {
       vscode.postMessage({ type: 'openMakeProtoRuleHelp' });
+    });
+
+    document.getElementById('testNavigation')?.addEventListener('click', () => {
+      vscode.postMessage({ type: 'testNavigation' });
+    });
+
+    document.getElementById('openOutput')?.addEventListener('click', () => {
+      vscode.postMessage({ type: 'openOutput' });
+    });
+
+    document.getElementById('compileCurrentProto')?.addEventListener('click', () => {
+      vscode.postMessage({ type: 'compileCurrentProto' });
+    });
+
+    document.getElementById('diagnoseCurrentSymbol')?.addEventListener('click', () => {
+      vscode.postMessage({ type: 'diagnoseCurrentSymbol' });
     });
 
     document.getElementById('addProtoRoot')?.addEventListener('click', () => {
