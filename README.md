@@ -195,14 +195,6 @@ JumpProto 帮助 Go 项目在生成后的 Go 代码和源 `.proto` 文件之间�
 - 在侧边栏运行或 dry-run 当前 Proto 文件的编译命令；
 - 在跳转结果异常时查看诊断信息并清理缓存。
 
-## 截图
-
-![JumpProto 侧边栏：Proto 根目录与编译规则](resources/screenshots/sidebar-overview.png)
-
-![从生成 Go 代码跳转到源 Proto 定义](resources/screenshots/go-to-proto.png)
-
-![从 Proto 字段查找 Go 使用处](resources/screenshots/proto-to-go.png)
-
 ## 安装
 
 - [从 Visual Studio Marketplace 安装](https://marketplace.visualstudio.com/items?itemName=SivanLiu.jumpproto)

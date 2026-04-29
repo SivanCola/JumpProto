@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.1 - 2026-04-30
+
+- Removed duplicate screenshots from the Chinese README section so marketplace pages keep the visual examples in the English overview only.
+
 ## 1.1.0 - 2026-04-30
 
 - Added the redesigned JumpProto sidebar with English-first UI, language and theme controls, project configuration, diagnostics, and cache cleanup.
