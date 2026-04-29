@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package shared.external;
+
+option go_package = "example.com/project/gen/sharedpb;sharedpb";
+
+message ExternalThing {
+  string id = 1;
+}

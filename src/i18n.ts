@@ -57,6 +57,11 @@ export type Strings = {
   unsaved: string;
   openJson: string;
   testCommand: string;
+  testNavigation: string;
+  openOutput: string;
+  renderedCommandPreview: string;
+  renderedCommandPreviewNeedProto: string;
+  renderedCommandPreviewNeedContext: string;
   addProtoRoot: string;
   noProtoRoots: string;
   notConfigured: string;
@@ -68,6 +73,12 @@ export type Strings = {
   goToProtoDefinition: string;
   goToGoUsage: string;
   compileCurrentProto: string;
+  diagnoseCurrentSymbol: string;
+  testNavigationDone: string;
+  testNavigationNeedEditor: string;
+  testNavigationUnsupported: string;
+  testNavigationResolved: string;
+  testNavigationNoResult: string;
   editMakeProtoRule: string;
   language: string;
   languageChinese: string;
@@ -96,6 +107,7 @@ export type Strings = {
   testMakeProtoRuleNeedActiveProto: string;
   testMakeProtoRuleDone: string;
   testMakeProtoRuleFailed: string;
+  diagnoseCurrentSymbolDone: string;
 };
 
 export function getStrings(lang: UiLanguage = getUiLanguage()): Strings {
@@ -145,6 +157,11 @@ export function getStrings(lang: UiLanguage = getUiLanguage()): Strings {
       unsaved: '未保存',
       openJson: '展开到 JSON',
       testCommand: '测试命令',
+      testNavigation: '测试跳转',
+      openOutput: '打开输出',
+      renderedCommandPreview: '展开后的命令',
+      renderedCommandPreviewNeedProto: '打开 .proto 文件后显示展开结果',
+      renderedCommandPreviewNeedContext: '当前 .proto 不在可识别的 proto_src / protoRoots 下',
       addProtoRoot: '添加 Proto 根目录',
       noProtoRoots: '暂无 Proto 根目录',
       notConfigured: '未配置',
@@ -156,6 +173,12 @@ export function getStrings(lang: UiLanguage = getUiLanguage()): Strings {
       goToProtoDefinition: '跳转到 Proto 定义',
       goToGoUsage: '跳转到 Go 使用处',
       compileCurrentProto: '编译当前 Proto',
+      diagnoseCurrentSymbol: '诊断当前符号',
+      testNavigationDone: 'JumpProto: 测试跳转结果已写入输出面板。',
+      testNavigationNeedEditor: 'JumpProto: 请先打开 Go 或 .proto 文件并将光标放在符号上。',
+      testNavigationUnsupported: 'JumpProto: 测试跳转仅支持 Go 和 .proto 文件。',
+      testNavigationResolved: 'JumpProto: 已解析到结果，未执行跳转。',
+      testNavigationNoResult: 'JumpProto: 未解析到跳转结果。',
       editMakeProtoRule: '编辑 Make Proto 规则',
       language: '语言',
       languageChinese: '中文',
@@ -183,7 +206,8 @@ export function getStrings(lang: UiLanguage = getUiLanguage()): Strings {
       makeProtoRuleEmpty: 'JumpProto: Make Proto 规则为空，请先填写。',
       testMakeProtoRuleNeedActiveProto: 'JumpProto: 请先打开一个 .proto 文件用于测试命令。',
       testMakeProtoRuleDone: 'JumpProto: 测试通过（dry-run，仅校验命令模板和 shell 语法）。',
-      testMakeProtoRuleFailed: 'JumpProto: 测试失败。'
+      testMakeProtoRuleFailed: 'JumpProto: 测试失败。',
+      diagnoseCurrentSymbolDone: 'JumpProto: 诊断信息已写入输出面板。'
     };
   }
 
@@ -232,6 +256,11 @@ export function getStrings(lang: UiLanguage = getUiLanguage()): Strings {
     unsaved: 'Unsaved',
     openJson: 'Open JSON',
     testCommand: 'Test Command',
+    testNavigation: 'Test Navigation',
+    openOutput: 'Open Output',
+    renderedCommandPreview: 'Rendered Command',
+    renderedCommandPreviewNeedProto: 'Open a .proto file to preview the rendered command',
+    renderedCommandPreviewNeedContext: 'Current .proto is not under a recognized proto_src / protoRoots path',
     addProtoRoot: 'Add Proto Root',
     noProtoRoots: 'No Proto Roots',
     notConfigured: 'Not configured',
@@ -243,6 +272,12 @@ export function getStrings(lang: UiLanguage = getUiLanguage()): Strings {
     goToProtoDefinition: 'Go to Proto Definition',
     goToGoUsage: 'Go to Go Usage',
     compileCurrentProto: 'Compile Current Proto',
+    diagnoseCurrentSymbol: 'Diagnose Current Symbol',
+    testNavigationDone: 'JumpProto: Test navigation result written to the output panel.',
+    testNavigationNeedEditor: 'JumpProto: Open a Go or .proto file and place the cursor on a symbol first.',
+    testNavigationUnsupported: 'JumpProto: Test navigation supports Go and .proto files only.',
+    testNavigationResolved: 'JumpProto: Resolved a result without jumping.',
+    testNavigationNoResult: 'JumpProto: No navigation result resolved.',
     editMakeProtoRule: 'Edit Make Proto Rule',
     language: 'Language',
     languageChinese: '中文',
@@ -270,6 +305,7 @@ export function getStrings(lang: UiLanguage = getUiLanguage()): Strings {
     makeProtoRuleEmpty: 'JumpProto: Make proto rule is empty. Fill it first.',
     testMakeProtoRuleNeedActiveProto: 'JumpProto: Open a .proto file first to test the command.',
     testMakeProtoRuleDone: 'JumpProto: Test passed (dry-run; template and shell syntax only).',
-    testMakeProtoRuleFailed: 'JumpProto: Test failed.'
+    testMakeProtoRuleFailed: 'JumpProto: Test failed.',
+    diagnoseCurrentSymbolDone: 'JumpProto: Diagnostics written to the output panel.'
   };
 }

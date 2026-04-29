@@ -48,3 +48,22 @@ test('findProtoSymbolMatch maps generated nested Go container names to proto mes
   assert.equal(m?.kind, 'field');
   assert.equal(proto.slice(m!.startOffset, m!.endOffset), 'target_field');
 });
+
+test('findProtoSymbolMatch ignores declarations inside comments and strings', () => {
+  const proto = `// message Hidden {}\nmessage Visible {\n  string note = 1 [json_name = "rpc Hidden {}"];\n}\n/* enum HiddenEnum { HIDDEN = 0; } */\n`;
+  assert.equal(findProtoSymbolMatch(proto, 'Hidden'), undefined);
+  assert.equal(findProtoSymbolMatch(proto, 'HiddenEnum'), undefined);
+
+  const m = findProtoSymbolMatch(proto, 'Visible');
+  assert.ok(m);
+  assert.equal(m?.kind, 'message');
+  assert.equal(proto.slice(m!.startOffset, m!.endOffset), 'Visible');
+});
+
+test('findProtoSymbolMatch tolerates braces in comments and strings while finding fields', () => {
+  const proto = `message Outer {\n  // } should not close the message\n  string note = 1 [json_name = "not_a_block_}"];\n  string target_field = 2;\n}\n`;
+  const m = findProtoSymbolMatch(proto, 'TargetField', 'Outer');
+  assert.ok(m);
+  assert.equal(m?.kind, 'field');
+  assert.equal(proto.slice(m!.startOffset, m!.endOffset), 'target_field');
+});

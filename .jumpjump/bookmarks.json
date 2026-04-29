@@ -1,0 +1,36 @@
+{
+  "version": 2,
+  "groups": [
+    {
+      "id": "ungrouped",
+      "name": "未分组",
+      "order": 0,
+      "collapsed": false,
+      "sortBy": "createdAt",
+      "sortDirection": "desc",
+      "system": true
+    },
+    {
+      "id": "group-测试",
+      "name": "测试",
+      "order": 1,
+      "collapsed": false,
+      "sortBy": "manual",
+      "sortDirection": "asc"
+    }
+  ],
+  "items": [
+    {
+      "id": "50354de4-e8a6-4d43-9ec0-0a2d64aa4a24",
+      "type": "line",
+      "label": "verify-release.mjs:1",
+      "path": "scripts/verify-release.mjs",
+      "line": 1,
+      "groupId": "group-测试",
+      "lastOpenedAt": "2026-04-29T11:59:10.192Z",
+      "createdAt": "2026-04-29T11:58:41.438Z",
+      "updatedAt": "2026-04-29T11:59:02.594Z",
+      "manualOrder": 0
+    }
+  ]
+}

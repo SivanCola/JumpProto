@@ -1,5 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
-  <path fill="currentColor" d="M4 6.5A2.5 2.5 0 0 1 6.5 4h7A2.5 2.5 0 0 1 16 6.5V8h-9.5A2.5 2.5 0 0 1 4 5.5v1z"/>
-  <path fill="currentColor" d="M4 9.5A2.5 2.5 0 0 1 6.5 7H18a2 2 0 0 1 2 2v9a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 18V9.5zm4.5 2.75a.75.75 0 0 0 0 1.5h5.69l-1.72 1.72a.75.75 0 1 0 1.06 1.06l3-3a.75.75 0 0 0 0-1.06l-3-3a.75.75 0 0 0-1.06 1.06l1.72 1.72H8.5z"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+  <path d="M6.25 5.25h4.5v4.5h-4.5z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+  <path d="M4.75 16.25h4.5v4.5h-4.5z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+  <path d="M12.75 16.25h4.5v4.5h-4.5z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+  <path d="M8.5 9.75v2.25c0 1.1-.9 2-2 2H7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M8.5 12h6.5c1.1 0 2 .9 2 2v.75" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M14.25 4.75h3.25A1.75 1.75 0 0 1 19.25 6.5v4.75" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="m17 9 2.25 2.25L21.5 9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M14.25 7.25h2.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
 </svg>
-

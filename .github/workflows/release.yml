@@ -4,7 +4,12 @@ on:
   push:
     tags:
       - "v*"
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version without leading v. Must match package.json."
+        required: true
+        type: string
 
 jobs:
   release:
@@ -22,18 +27,26 @@ jobs:
       - name: Install
         run: npm ci
 
+      - name: Verify release metadata
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: npm run release:verify:metadata
+
       - name: Test
         run: npm test
 
       - name: Package VSIX
-        run: |
-          mkdir -p dist
-          npx @vscode/vsce package --out dist/JumpProto.vsix
+        run: npm run vsix
+
+      - name: Verify VSIX
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: npm run release:verify
 
       - name: Publish to VS Code Marketplace
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
-        run: npx @vscode/vsce publish -p "$VSCE_PAT"
+        run: npx @vscode/vsce publish --packagePath dist/JumpProto.vsix -p "$VSCE_PAT"
 
       - name: Publish to Open VSX
         env:
@@ -43,4 +56,5 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', inputs.version) }}
           files: dist/JumpProto.vsix
